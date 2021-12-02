@@ -1,0 +1,138 @@
+"""
+ELASTIC SEARCH 
+#CORE COMPONENTS
+ - Logstash and Beats facilitate collecting, aggregating, and enriching and storing your data in ElasticSearch
+ - kibana : enables you to interactivly explore, visualize, and share insights into your data and monitor the stack
+ - Elastic Search: where the indexing, search, and analysis occurs (its the engine/db)
+
+#Links
+#ElasticSearch With Embeddings = https://www.elastic.co/blog/text-similarity-search-with-vectors-in-elasticsearch
+
+##############
+#Elastic Data Input Structure(documents and indices)
+##############
+
+#Stores data structures as serialized JSON documents (instead of rows/columns)
+
+#Uses an Inverted index to support full-text searches
+ - Inverted Index: lists every unique word that appears in any docuyment and    entifies all the documents each word occurs in 
+
+#Ability to use per-field data structures to assemble and return search results
+
+#Field Design Tips
+ - Useful to index the same field in differnt ways for differnt purposes (ex. index a string field as both a text field for search, and keyword field for sorting and aggregating data)
+ - When dynamic mapping is enabled, Elastic automatically detects and adds new fields to the index. 
+
+
+##############
+#Elastic Data Output Structure (search and analyze)
+##############
+#Elasticsearch Query DSL provides json like query collecting
+#Index = Database 
+#type = table 
+#mapping tyes are deprecated and no longer used 
+
+##############
+#Elastic INSTALL 
+##############
+#Note: when you create a deployment on the Elasticsearch Service a master node and two data nodes are provisioned automatically. 
+#Note: by installing from tar or zip, you can start mulitple instances of Elasticsearch locally to see how a multi-node cluster behaves 
+
+#1.Download Elastic to dir (C:\Users\zjc10\Desktop\Utils\)
+https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-7.4.1-windows-x86_64.zip
+
+#2.extract zip directory 
+cd C:\Users\zjc10\Desktop\Utils
+Expand-Archive elasticsearch-7.4.1-windows-x86_64.zip
+
+#3.Start Elastic search from bin directory 
+cd c:\Users\zjc10\Desktop\Utils\elasticsearch-7.4.1\bin 
+.\elasticsearch.bat
+
+#4.Start 2 more instances of Elasticsaerch to set up a multi-node cluster 
+#Note: you must specify unique data and log paths for each node 
+#Note: because you will be running all 3 nodes locally, they automatically join the cluster with the first node.
+.\elasticsearch.bat -E path.data=data2 -E path.logs=log2
+.\elasticsearch.bat -E path.data=data3 -E path.logs=log3
+
+#5. Use the cat health API to verify your three node cluster is up and running 
+ - cat APIs return information about your cluster and indices in a format thats easier to read that raw json 
+ - You can interact directly with your cluster by submitting HTTP requests to REST API 
+curl -X GET "localhost:9200/_cat/health?v&pretty"
+
+
+#6.Understand syntax used to index documents 
+#process to put JSON documents into an ElasticSearch index(table)
+#below ex: automatically creates the customer indexz , adds a new doc that has an id of 1, and stores and indexes the name field 
+curl -X PUT "localhost:9200/customer/_doc/1?pretty" -H 'Content-Type: application/json' -d'
+{
+  "name": "John Doe"
+}'
+
+#7.Understand syntax used to retrieve indexed documents 
+#GET request that specifies document ID. 
+curl -X GET "localhost:9200/customer/_doc/1?pretty"
+
+#8.Understand Syntax used to upload documents in bulk
+  #NOTE: each record to be uploaded must have a unique _id (it will get automatically generated if not specified)
+  #0. bulk upload syntax format example
+  { "index" : { "_index" : "testindex", "_type" : "somerandomtype", "_id" : "1" } }
+  { "country_name" : "South America","continent":"Africa", "country_abrev":"ZA" }
+
+ #0. generic english syntax of above 
+ { action_to_be_performed: { metadata_related_to_action_performed }}\newline
+ { request_body_usually_data_to_be_indexed        }\newline
+
+ #1.action_to_be_performed
+    {"index":...}
+ #2.the index we ar indeing the data into is "testindex"(database), as long as you specify the index name inthe metadata of the related action to be performed, the index will be created during bulk insert
+    {"_index":"database_name"}
+ #3.specify the type by which the data will be indexed(~type = sql table)
+    {"_index":"database_name","_type":"tablename"}
+ #4.speify the actual data to index into Elastic search (the requeset body)
+    {"fieldname":"value","fieldname2":"value",...}
+
+#8.Indexing documents in bulk (bulk API)
+ - Optimal Batch Size: 1000-5000 or a total payload of 5MB-15MB
+curl -H "Content-Type: application/json" -XPOST "localhost:9200/webhose/_bulk?pretty&refresh" --data-binary "@accounts.json"
+curl -H "Content-Type: application/x-ndjson" -XPOST "localhost:9200/webhose/_bulk?pretty" --data-binary @C:\\Users\\zjc10\\Desktop\\Projects\\data\\news\\webhose_news\\webhose_elstc.json
+curl "localhost:9200/_cat/indices?v"
+
+#9.Show statistics for all indexes in elastic 
+curl -X GET "localhost:9200/webhose/_stats?pretty"
+
+#10.Query documents(results 10 to 20) (from cli)
+curl -X GET "localhost:9200/webhose/_search?pretty" -H 'Content-Type: application/json' -d'
+{
+  "query": { "match_all": {} },
+  "sort": [
+    { "date": "asc" }
+  ],
+  "from": 10,
+  "size": 10
+}
+'
+curl -X GET "localhost:9200/webhose/_search?pretty" -H  -d {"query":{"match":{"title": "Nintendo"}}}
+
+
+###################
+#####KIBANA########
+###################
+#spin up your elastic cluster 3(nodes)
+#By default, Kibana connects to the Elasticsearch instance running on localhost. 
+#By default, Kibana runs in the foreground, prints its logs to STDOUT
+#The Kibana server reads properties from the kibana.yml file on startup. ($KIBANA_HOME/config.)
+#Kibana is hosted on port 5601 (localhost:5601)
+#Kibana Status monitoring: localhost:5601/status
+#FIRST TIME you access kibana, your are prompted to define an index that matches the name of one or more of indices stored in elastic
+#Add Indexes at any time in kibana from the Managment tab 
+#spin up kibanna from cli 
+cd C:\Users\zjc10\Desktop\Utils\kibana*
+.\bin\kibana.bat
+
+
+
+
+
+"""
+

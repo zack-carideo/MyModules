@@ -1,0 +1,15 @@
+#ELASTIC PARAMETR INFO 
+#############
+##ANALYZERS##
+#############
+Standard: divides text into terms on word boundaries (removes punctution , lowercases, and supports removing stopwords)
+Simple: divides text into terms whenever it encounters a character which is not a letter, lowercases all 
+Keyword: a 'noop' analyzer that accepts whatever text it is given and outputs the exact same text as a single term 
+Pattern: uses regex to split the term into terms 
+FingerPrint: creates a fingerprint to use in deduplication
+
+############
+#SEARCH API#
+############
+
+#MLT(Most like this)Queries: https://www.elastic.co/guide/en/elasticsearch/reference/7.4/query-dsl-mlt-query.html
