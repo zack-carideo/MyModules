@@ -1,6 +1,9 @@
 # Utilty functions for reading and writing data 
 from utils.decorators import Timer 
+import pandas as pd
+import logging,yaml,os
 
+logger = logging.getLogger()
 
 @Timer
 def open_file(file_path):
@@ -31,4 +34,16 @@ def open_file(file_path):
 
 
 
+#load a yaml file into python as a dictionary
+def load_yaml(yaml_path:str):
+    """[utility to load yaml file]
 
+    Args:
+        yaml_path (str): [path to yaml file to parse]
+
+    Returns:
+        [dict[anything]]: [dic containing parsed yaml info (values can be any python object)]
+    """
+    with open(yaml_path,'r')as f:
+        yaml_info = yaml.full_load(f)
+    return yaml_info
