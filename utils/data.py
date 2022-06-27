@@ -7,7 +7,7 @@ logger = logging.getLogger()
 
 @Timer
 def open_file(file_path):
-    """general function to open a file 
+    """general function to open a file with pandas
 
     Args:
         file_path (str): path to file 
@@ -47,3 +47,14 @@ def load_yaml(yaml_path:str):
     with open(yaml_path,'r')as f:
         yaml_info = yaml.full_load(f)
     return yaml_info
+
+#list all files in a directory
+import pathlib
+def get_filepaths(directory_root: str):
+    """
+
+    @param directory_root: the root to the directory path
+    @return: generator of filepaths present in directory_root
+    """
+    for filepath in pathlib.Path(directory_root).glob('**/*'):
+        yield filepath.absolute()

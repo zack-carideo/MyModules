@@ -1,6 +1,7 @@
-#Find the avg of all numeric columns
-from pyspark.sql.functions import when, lit, col , avg
+from pyspark 
+import pyspark.sql.functions as F 
 from pyspark.sql.types import  StringType, IntegerType 
+
 
 #sample a row from sparkdf and convert to dictionary for easy analysis 
 def row2dic(sparkdf):
@@ -13,7 +14,7 @@ def mean_of_pyspark_columns(df, numeric_cols, verbose=False, fill_missing= False
     #calculate the mean value per columns 
     col_with_mean=[]
     for col in numeric_cols:
-        mean_value = df.select(avg(df[col]))
+        mean_value = df.select(F.avg(df[col]))
         avg_col = mean_value.columns[0]
         res = mean_value.rdd.map(lambda row : row[avg_col]).collect()
         
@@ -26,8 +27,8 @@ def mean_of_pyspark_columns(df, numeric_cols, verbose=False, fill_missing= False
         col_with_mean = mean_of_pyspark_columns(df, numeric_cols) 
         
         for col, mean in col_with_mean:
-            df = df.withColumn(col, when(df[col].isNull()==True, 
-            lit(mean)).otherwise(df[col]))
+            df = df.withColumn(col, F.when(df[col].isNull()==True, 
+            F.lit(mean)).otherwise(df[col]))
 
         return df
 
@@ -61,8 +62,8 @@ def mode_of_pyspark_columns(df, cat_col_list, verbose=False,fill_missing=False):
         col_with_mode =mode_of_pyspark_columns(df, cat_col_list)
         
         for col, mode in col_with_mode:
-            df = df.withColumn(col, when(df[col].isNull()==True, 
-            lit(mode)).otherwise(df[col]))
+            df = df.withColumn(col, F.when(df[col].isNull()==True, 
+            F.lit(mode)).otherwise(df[col]))
             
         return df
     if fill_missing:
@@ -94,7 +95,7 @@ def assign_sparkdf_coldtypes(spark_df):
 
     for k,v in out.items():
         if v=='string':
-            spark_df = spark_df.withColumn(k, col(k).cast(StringType()))
+            spark_df = spark_df.withColumn(k, F.col(k).cast(StringType()))
         else:
-            spark_df = spark_df.withColumn(k, col(k).cast(IntegerType()))
+            spark_df = spark_df.withColumn(k, F.col(k).cast(IntegerType()))
     return spark_df
