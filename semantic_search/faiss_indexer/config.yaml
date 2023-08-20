@@ -1,0 +1,15 @@
+data:
+  input:
+    data_path: 'C:/Users/zjc10/Desktop/Projects/data/cfpb/cfpb_complaints.csv'
+  output: 
+    data_save_dir: "C:/Users/zjc10/Desktop/Projects/data/semantic_search/output"
+    
+model:
+  model_save_dir: "C:/Users/zjc10/Desktop/Projects/data/semantic_search/models"
+  llm_model_name:  'sentence-transformers/bert-base-nli-mean-tokens'
+  text_col:  'consumer_complaint_narrative'
+  batch_size: 50
+  n_samps: 90 
+inference:
+  queries: ['i like to complain','my name is zack, i like donuts', 'remove THAT FEE!']
+

@@ -1,0 +1,14 @@
+data:
+  input:
+    data_path: 'C:/Users/zjc10/Desktop/Projects/data/cfpb/cfpb_complaints.csv'
+  output: 
+    data_save_dir: "C:/Users/zjc10/Desktop/Projects/data/semantic_search/output"
+    
+model:
+  model_save_dir: "C:/Users/zjc10/Desktop/Projects/data/semantic_search/models"
+  llm_model_name:  'BeIR/query-gen-msmarco-t5-large-v1'
+  bi_encoder_model_name: 'microsoft/mpnet-base'
+  batch_size: 50
+  n_epochs: 3
+  n_samps: 90 
+
