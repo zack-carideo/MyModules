@@ -1,7 +1,9 @@
 # Utilty functions for reading and writing data 
 from utils.decorators import Timer 
-import pandas as pd
 import logging,yaml,os
+import pandas as pd
+import numpy as np 
+from sklearn.model_selection import StratifiedKFold
 
 logger = logging.getLogger()
 
@@ -58,3 +60,25 @@ def get_filepaths(directory_root: str):
     """
     for filepath in pathlib.Path(directory_root).glob('**/*'):
         yield filepath.absolute()
+        
+
+
+#generate k cv datasets for training evaluation 
+def stratifiedkfold(y,*,n_splits=5, shuffle=True):
+    
+    """
+    Stratified K-Folds cross-validator 
+    Return the indices of the train and validation folds
+    
+    NOTE: python seed used to ensure reproducibility, it is either set locally or globally via PYTHONHASHSEED envvar  
+    """
+    SEED = 123 if os.environ.get('PYTHONHASHSEED') is None else int(os.environ['PYTHONHASHSEED'])
+    
+    skf = StratifiedKFold(n_splits= n_splits, random_state=SEED, shuffle=shuffle)
+    splits = list(skf.split(X=np.zeros(len(y)),y=y))
+    folds = {}
+    
+    for idx, (train_idx, val_idx) in enumerate(splits):
+        folds[idx] = {'train':train_idx , 'val':val_idx}
+    
+    return folds, skf
