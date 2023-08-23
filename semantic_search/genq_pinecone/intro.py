@@ -1,4 +1,4 @@
-import sys,os,logging
+import sys,os,logging, gc
 import pandas as pd
 from pathlib import Path
 from transformers import T5Tokenizer, T5ForConditionalGeneration
@@ -14,10 +14,11 @@ cfg_path = Path(root_) / "config.yaml"
 
 #custom imports
 sys.path.append(root_)
-from utils.misc import LoadCFG, seed_all
-from utils.data import load_data
-from utils.embedding_ops import query_ops
-from utils.model_ops import build_model 
+from util.misc import LoadCFG, seed_all
+from util.data import load_data
+from util.embedding_ops import query_ops
+from util.model_ops import build_model 
+from util.index_ops import ScalableSemanticSearch
 
 #set seed 
 SEED = 42
@@ -28,13 +29,33 @@ cfg = LoadCFG(cfg_path, base_dir = root_).load()
 DATA_PATH = cfg.data.input.data_path
 SAVE_DIR = Path(cfg.data.output.data_save_dir)
 MODEL_SAVE_DIR = Path(cfg.model.model_save_dir)
-LLM_MODEL_NAME = cfg.model.llm_model_name 
-BI_ENCODER_MODEL_NAME = cfg.model.bi_encoder_model_name
-EPOCHS = cfg.model.n_epochs
-BATCH_SIZE = cfg.model.batch_size
-NSAMPS = cfg.model.n_samps
 
+NSAMPS = cfg.model.n_samps
+TOK_BATCH_SIZE = cfg.model.tokenizer.batch_size
+BI_ENCODER_MODEL_NAME = cfg.model.bi_encoder.model_name
+EPOCHS = cfg.model.n_epochs
+BI_ENCODER_BATCH_SIZE =  cfg.model.bi_encoder.batch_size
+
+
+#device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+#tokenizer setup
+return_tensors = cfg.model.tokenizer.return_tensors
+padding =  cfg.model.tokenizer.padding
+return_overflow_tokens= cfg.model.tokenizer.return_overflow_tokens
+max_seq_len = cfg.model.tokenizer.max_seq_len
+truncation = cfg.model.tokenizer.truncation 
+stride = cfg.model.tokenizer.stride 
+
+#query generator setup
+GENQ_MODEL_NAME = cfg.model.query_gen.model_name 
+N_QUERIES_PER_PASSAGE =  cfg.model.query_gen.n_queries_per_passage 
+
+#clean up gpu 
+torch.cuda.empty_cache()
+gc.collect()
+logger.info(torch.cuda.memory_summary(device='cuda', abbreviated=True))
 
 #create output folder if it doesnt exist
 if not SAVE_DIR.is_dir():
@@ -53,7 +74,9 @@ if not MODEL_SAVE_DIR.is_dir():
 #load data (directly from hf, to load from file please reference load_data() definition)
 #Note: we are loading a squad dataset made for NLI type operations
 logging.info('loading data from huggyface')
-df = load_data( load_from_directory=False , hf_dataset_name = 'squad' , split ='train') 
+df = load_data( load_from_directory=False 
+               , hf_dataset_name = 'squad' 
+               , split ='train') 
 
 
 # we want to emulate the scenario in which we do not have queries. 
@@ -66,26 +89,31 @@ print(len(passages))
 #initalize tokenizer and use t5 as query generation model used to generate queries associated with input passages 
 #Note: we are using a t5 model fine tuned for query generation as part of the BeIR Project 
 logger.info('creating tokenizer and model to use in bi-encoder')
-tokenizer  = T5Tokenizer.from_pretrained(LLM_MODEL_NAME, legacy=False, truncation=True, max_len=500) 
-
 logger.info('creating model to use in bi-encoder')
-model = T5ForConditionalGeneration.from_pretrained(LLM_MODEL_NAME)
+tokenizer  = T5Tokenizer.from_pretrained(GENQ_MODEL_NAME, legacy=False) 
+qgen_model = T5ForConditionalGeneration.from_pretrained(GENQ_MODEL_NAME)
 
 #call eval() to force / ensure model is running in 'INFERENCE MODE' and not 'TRAINING' mode
 logger.info('forcing model into eval mode')
-model.eval()
-model = model.to(device)
-tokenizer = tokenizer
+qgen_model.eval()
+model = qgen_model.to(device)
+#tokenizer = tokenizer
 print(device)
 
 #initalize class to generate queries from passages
 logger.info('initalize embedding querier')
 queryer = query_ops(
      tokenizer
-    , model 
+    , qgen_model 
     , SAVE_DIR
-    , n_queries_per_passage = 3
-    , batch_size = 3
+    , n_queries_per_passage = N_QUERIES_PER_PASSAGE
+    , batch_size = TOK_BATCH_SIZE
+    , return_tensors = return_tensors
+    , padding =  padding
+    , return_overflowing_tokens= return_overflow_tokens
+    , max_seq_len = max_seq_len
+    , truncation = truncation 
+    , stride = stride 
     )
 
 #generate query,passage key value pairs , save to disk , return paths 
@@ -98,12 +126,20 @@ pairs = queryer.create_training_data( query_passage_outpaths)
 
 #create object to handle loading of InputExample() instances in batches of 50 
 logger.info('creating loader to handle loading batches of data for model training')
-#loader = queryer.gen_model_data_loader(pairs, batch_size = 2)
 
-#build and train the bi-encoder to be used for asymetric search 
+#build and train the bi-encoder to be used for asymetric search (information retrieval)
 logger.info('building model')
-model = build_model(pairs
+ir_model = build_model(pairs
                     , BI_ENCODER_MODEL_NAME
                     , str(MODEL_SAVE_DIR / 'fine_tuned_biencoder')
-                    , epochs=EPOCHS)
-    
+                    , epochs=EPOCHS
+                    , batch_size = BI_ENCODER_BATCH_SIZE
+                    )
+
+
+
+
+index_ = ScalableSemanticSearch( device="gpu"
+                                , model = qgen_model)
+
+index_.build_index()
