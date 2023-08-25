@@ -167,7 +167,7 @@ class sent_embedder:
                 sent_embed_batches.append(mean_pooling(se_, attnmsk))
             
         return sent_embed_batches
-
+    
     def e2e(self, text_list: List) -> List[torch.Tensor]:
         """function to execute e2e tokenization and embedding creation from a list of texts
 
