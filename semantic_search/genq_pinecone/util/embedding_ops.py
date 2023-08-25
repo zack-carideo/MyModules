@@ -1,12 +1,19 @@
-import torch
+import torch, gc
 from tqdm.auto import tqdm
 import pathlib
 from pathlib import Path 
 from typing import List ,  Tuple
+import pandas as pd 
 
 from sentence_transformers import InputExample, datasets, models, SentenceTransformer
 from tqdm.auto import tqdm
 
+def create_batch(iterable, batch_size=100):
+    length = len(iterable)
+    for ndx in range(0, length, batch_size):
+        yield iterable[ndx: (ndx + batch_size)]
+        
+        
 class query_ops:
 
     def __init__(
@@ -15,7 +22,8 @@ class query_ops:
         , model 
         , out_dir 
         , n_queries_per_passage = 3
-        , batch_size = 50
+        , train_batch_size = 5
+        , save_batch_size = 1000
         
         #tokenizer params
         , return_tensors='pt'
@@ -46,7 +54,8 @@ class query_ops:
         self._model = model 
         self._tokenizer = tokenizer 
         self._n_queries_per_passage = n_queries_per_passage
-        self._batch_size = batch_size 
+        self._train_batch_size = train_batch_size
+        self._save_batch_size = save_batch_size 
         
         self._return_tensors = return_tensors
         self._padding = padding
@@ -56,6 +65,7 @@ class query_ops:
         self._stride = stride
         
         self._query_passage_outpaths = []
+        self._passage2chunk_map = None
         
     def load_query_passage_pairs(self):
         """load query passage pairs generated from t5 
@@ -88,32 +98,44 @@ class query_ops:
         assert self._out_dir is not None, 'please specificy output directory to save embedded text'
         
         #containers for outputs
-        pairs = []
+        scored_df_list = []
         file_count = 0
+
 
         # set to no_grad as we don't need to calculate gradients for back prop
         with torch.no_grad():
             
             # loop through each passage individually
-            for p in tqdm(list_of_texts):
+            for p in tqdm(create_batch(list_of_texts,self._train_batch_size)):
+    
                 
-                p = p.replace('\t', ' ')
+                torch.cuda.empty_cache()
+                gc.collect()
+        
+                #clean tabs 
+                p = [p_.replace('\t', ' ') for p_ in p]
                 
                 # encode input tokens and return as pytorch tennsors
                 # ENCODE THE TOKENIZED PASSAGE THAT YOU WANT TO GENERATE QUIERIES FOR 
                 # DONT FORGET TO PUSH THE DATA TO THE GPU TO ENABLE GPU BASED PROCESSING  (.to('cuda'))
-                input_ids = self._tokenizer.encode(p
-                                                   , return_overflowing_tokens = self._return_overflowing_tokens
-                                                   , return_tensors=self._return_tensors
-                                                   , truncation=self._truncation
-                                                   , padding = self._padding
-                                                   , stride = self._stride
-                                                   ).to('cuda')
+                input_ids = self._tokenizer(p
+                                            , return_overflowing_tokens = self._return_overflowing_tokens                                            #, return_tensors=self._return_tensors
+                                            , truncation= True 
+                                            , padding = True
+                                            , stride = self._stride
+                                            , max_length = self._max_seq_length
+                                            )
                 
-                # generate output tokens from input passage
-                # OUTPUT TOKENS = QUERIES , so we are passing in the long passage and the model is generating n  queries based on the passage
-                # our queries will have a max length of 64 tokens and the variation across queries will be low (p=.95)
-                # THIS IS OCCURING 1 text at a time, THERE HAS TO BE AN EASY WAY TO EXECUTE THIS IN BATCHES!?!? 
+                # create  mapping of passages to chunks (for audit policy tracking)
+                # decoding because the tokenizer generated a sliding window wwith span 
+                # that we must keep track of to keep doc to chunk alignment 
+                passage2chunk_map =[{'text':a,'doc':b} for a,b in 
+                    zip(*[self._tokenizer.batch_decode(input_ids.input_ids),
+                        input_ids['overflow_to_sample_mapping']])
+                    ]
+                
+                
+                #generate queries 
                 outputs = self._model.generate(
                     
                     # Indices of input sequence tokens in the vocabulary`
@@ -121,60 +143,67 @@ class query_ops:
                     # `input_ids` parameter is a tensor containing the indices of the input tokens in the
                     # vocabulary. It is used by the model to understand the input and generate the
                     # corresponding queries.
-                    input_ids=input_ids, 
+                    input_ids = torch.Tensor(input_ids.input_ids).type(torch.int64).to('cuda')
                     
                     # The `max_length=64` parameter in the `model.generate()` function is setting the
                     # maximum length of the generated query. It ensures that the generated query will not
                     # exceed 64 tokens.
-                    max_length=64,
+                    , max_length = 64
                     
                     # The `do_sample=True` parameter in the `model.generate()` function is used to enable
                     # sampling during the generation of queries. When `do_sample=True`, the model will
                     # randomly sample from the top-k most likely next tokens, where k is determined by the
                     # `top_p` parameter. This allows for more diverse and creative query generation.
-                    do_sample=True,
+                    , do_sample = True
                     
                     # The `top_p=0.95` parameter in the `model.generate()` function is used to control the
                     # diversity of the generated queries.
-                    top_p=0.95,
-                    
+                    , top_p = .95
+
                     # The `num_return_sequences=3` parameter in the `model.generate()` function is used to
                     # specify the number of different query sequences to generate for each input passage.
                     # In this case, it is set to 3, which means that for each input passage, the model
                     # will generate 3 different query sequences.
-                    num_return_sequences=self._n_queries_per_passage
-                )
-   
-                #loop over the n encoded queries generated for passage(i) and decode them into 
-                #human readable form 
-                for output in outputs:
+                    , num_return_sequences = self._n_queries_per_passage         
+                                            ).to('cuda')
+                
+
+                #update  query passage map to hold text, doc, queries (bring back to cpu)
+                #use batch_size = number queries generated per each chunk, this ensures your decoding the right quereis for right doc
+                for idx,ec_query in enumerate(create_batch(outputs,self._n_queries_per_passage)):
+                    passage2chunk_map[idx].update({'ec_query_ids':ec_query.to('cpu')})
+                    passage2chunk_map[idx].update({'ec_query_txt':[self._tokenizer.decode(q_, skip_special_tokens=True) 
+                                                                for q_ in ec_query.to('cpu')]})
+            
+            
+                    #write aligned  query, passages to df 
+                    scored_df_list.append(pd.DataFrame.from_dict({k:v for k,v in passage2chunk_map[idx].items() if k!='ec_query_ids'}
+                                        ,orient='columns')
+                    )
                     
-                    query = self._tokenizer.decode(output, skip_special_tokens=True)
-    
-                    # append (query, passage) pair to pairs list, separate by \t
-                    pairs.append(query.replace('\t', ' ')+'\t'+p)
                 
-                # once we have 1024 pairs write to file
-                if len(pairs) > self._batch_size:
-                    with open(f'{self._out_dir}/pairs_{file_count}.tsv', 'w', encoding='utf-8') as fp:
-                        fp.write('\n'.join(pairs))
-                
-                    file_count += 1
-                    pairs = []
-                    self._query_passage_outpaths.append(f'{self._out_dir}/pairs_{file_count}.tsv')
+                if sum([x.shape[0] for x in scored_df_list])> self._save_batch_size:
+            
+                    out_p = f'{self._out_dir}/pairs_{file_count}.pq'
+                    pd.concat(scored_df_list).to_parquet(out_p)
+                    self._query_passage_outpaths.append(out_p)
+                    
+                    file_count+=1
+                    scored_df_list = []
+            
+            #clean up any reamaining 
+            if len(scored_df_list)>0:
+                out_p = f'{self._out_dir}/pairs_{file_count}.pq'
+                pd.concat(scored_df_list).to_parquet(out_p)
+                self._query_passage_outpaths.append(out_p)
 
-        if pairs is not None:
-            # save the final, smaller than 1024 batch
-            with open(f'{self._out_dir}/pairs_{file_count}.tsv', 'w', encoding='utf-8') as fp:
-                fp.write('\n'.join(pairs))
-
-            self._query_passage_outpaths.append(f'{self._out_dir}/pairs_{file_count}.tsv')
-
+        self._passage2chunk_map = passage2chunk_map
+        
         return [v for v in self._query_passage_outpaths]
 
-    def create_training_data(self
-                             , query_passage_outpaths: List = None
-                             ):
+
+
+    def create_training_data(self,query_passage_outpaths: list = None):
         
         """create a sentence_transformer training dataset of query,passage pairs to use in fine tunning a LLM  
         
@@ -186,19 +215,7 @@ class query_ops:
         if query_passage_outpaths is None: 
             query_passage_outpaths = self._query_passage_outpaths
             
-        pairs = []
-        for path in tqdm(query_passage_outpaths):
-            with open(path, 'r', encoding='utf-8') as fp:
-                lines = fp.read().split('\n')
-                for line in lines:
-                    if '\t' not in line:
-                        continue
-                    else:
-                        q, p = line.split('\t')
-                        pairs.append(
-                            (q,p)
-                            )
-        
-        return pairs 
-     
-
+        return [(x['ec_query_txt'],x['text']) 
+                 for idx, x in pd.concat([pd.read_parquet(p) 
+                                          for p in self._query_passage_outpaths]).iterrows()
+                 ]

@@ -1,7 +1,7 @@
 import sys,os,logging, gc
 import pandas as pd
 from pathlib import Path
-from transformers import T5Tokenizer, T5ForConditionalGeneration
+from transformers import AutoTokenizer, T5Tokenizer,T5TokenizerFast, T5ForConditionalGeneration
 import torch 
 #set up basic logging
 logging.basicConfig()
@@ -71,6 +71,10 @@ if not MODEL_SAVE_DIR.is_dir():
     assert SAVE_DIR.parent.is_dir(), f'parent directory: {SAVE_DIR} does not exist'
     os.mkdir(str(MODEL_SAVE_DIR))
 
+##
+##
+##
+
 #load data (directly from hf, to load from file please reference load_data() definition)
 #Note: we are loading a squad dataset made for NLI type operations
 logging.info('loading data from huggyface')
@@ -90,8 +94,10 @@ print(len(passages))
 #Note: we are using a t5 model fine tuned for query generation as part of the BeIR Project 
 logger.info('creating tokenizer and model to use in bi-encoder')
 logger.info('creating model to use in bi-encoder')
-tokenizer  = T5Tokenizer.from_pretrained(GENQ_MODEL_NAME, legacy=False) 
+#tokenizer  = T5Tokenizer.from_pretrained(GENQ_MODEL_NAME, legacy=False) 
 qgen_model = T5ForConditionalGeneration.from_pretrained(GENQ_MODEL_NAME)
+tokenizer = T5TokenizerFast.from_pretrained(GENQ_MODEL_NAME, do_lower_case=False)
+
 
 #call eval() to force / ensure model is running in 'INFERENCE MODE' and not 'TRAINING' mode
 logger.info('forcing model into eval mode')
@@ -107,7 +113,8 @@ queryer = query_ops(
     , qgen_model 
     , SAVE_DIR
     , n_queries_per_passage = N_QUERIES_PER_PASSAGE
-    , batch_size = TOK_BATCH_SIZE
+    , save_batch_size = 1000
+    , train_batch_size = TOK_BATCH_SIZE    
     , return_tensors = return_tensors
     , padding =  padding
     , return_overflowing_tokens= return_overflow_tokens
@@ -128,6 +135,7 @@ pairs = queryer.create_training_data( query_passage_outpaths)
 logger.info('creating loader to handle loading batches of data for model training')
 
 #build and train the bi-encoder to be used for asymetric search (information retrieval)
+#the trained model will encode passages into embeddings that are trained to be queried via short questions (as oppposed to just blindly taking the cossime between a short a long seq of text)
 logger.info('building model')
 ir_model = build_model(pairs
                     , BI_ENCODER_MODEL_NAME
@@ -138,8 +146,7 @@ ir_model = build_model(pairs
 
 
 
-
-index_ = ScalableSemanticSearch( device="gpu"
-                                , model = qgen_model)
-
-index_.build_index()
+#build serachable index from all trained docs 
+input_ids = queryer._tokenizer('where is egypt?',return_tensors='pt').input_ids
+outputs = model.generate(input_ids)
+print( queryer._tokenizer.decode(outputs[0], skip_special_tokens=True)

@@ -18,7 +18,7 @@ class ScalableSemanticSearch:
     def __init__(self, device="cpu", model: SentenceTransformer =  None):
         self.device = device
         self.model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2" , device=self.device) if model is None else model
-        self.dimension = self.model.shape[1] #self.model.get_sentence_embedding_dimension()
+        self.dimension = self.model.get_sentence_embedding_dimension()
         self.quantizer = None
         self.index = None
         self.hashmap_index_sentence = None

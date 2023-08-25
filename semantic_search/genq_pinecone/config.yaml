@@ -9,7 +9,7 @@ model:
   llm_model_name:  'BeIR/query-gen-msmarco-t5-large-v1'
   bi_encoder_model_name: 'microsoft/mpnet-base'
   n_epochs: 3
-  n_samps: 90 
+  n_samps: 20 
 
   tokenizer: 
     return_tensors: 'pt'
