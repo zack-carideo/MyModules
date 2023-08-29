@@ -87,10 +87,14 @@ def create_loss_function(model: sentence_transformers.SentenceTransformer):
 
 
 def build_model(query_passage_pairs
-                ,bi_encoder_model_name, model_outpath ,epochs=3, batch_size = 2):
+                ,bi_encoder_model_name
+                , model_outpath 
+                , epochs=3
+                , batch_size = 2):
     
     #create data loader 
-    loader = gen_model_data_loader( query_passage_pairs, batch_size = batch_size)
+    loader = gen_model_data_loader( query_passage_pairs
+                                   , batch_size = batch_size)
     
     #generate model grid/frame
     model = create_bi_encoder(bi_encoder_model_name)

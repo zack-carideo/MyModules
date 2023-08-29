@@ -1,196 +1,114 @@
-import csv
-import os
-import time
-from typing import List, Tuple, Callable, Any, Dict, Optional
-import logging
-import sys
+#https://towardsdatascience.com/master-semantic-search-at-scale-index-millions-of-documents-with-lightning-fast-inference-times-fa395e4efd88
+#https://www.kaggle.com/code/nandhuelan/semantic-search
 
-import faiss
-import numpy as np
-import psutil
-from sentence_transformers import SentenceTransformer
-import matplotlib.pyplot as plt
+import faiss , time
+import numpy as np 
+import pandas as pd
+import sentence_transformers
+from sentence_transformers import SentenceTransformer,  CrossEncoder 
 
-
-class ScalableSemanticSearch:
-    """Vector similarity using product quantization with sentence transformers embeddings and cosine similarity."""
-
-    def __init__(self, device="cpu", model: SentenceTransformer =  None):
-        self.device = device
-        self.model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2" , device=self.device) if model is None else model
-        self.dimension = self.model.get_sentence_embedding_dimension()
-        self.quantizer = None
-        self.index = None
-        self.hashmap_index_sentence = None
-
-        log_directory = "log"
-        if not os.path.exists(log_directory):
-            os.makedirs(log_directory)
-        log_file_path = os.path.join(log_directory, "scalable_semantic_search.log")
-
-        logging.basicConfig(
-            filename=log_file_path,
-            level=logging.INFO,
-            format="%(asctime)s %(levelname)s: %(message)s",
-        )
-        logging.info("ScalableSemanticSearch initialized with device: %s", self.device)
-
-    @staticmethod
-    def calculate_clusters(n_data_points: int) -> int:
-        return max(2, min(n_data_points, int(np.sqrt(n_data_points))))
-
-    def encode(self, data: List[str]) -> np.ndarray:
-        """Encode input data using sentence transformer model.
+class faiss_index:
+    
+    def __init__(self
+                 , data:pd.DataFrame
+                 , model: sentence_transformers.SentenceTransformer
+                 , embed_dim: int 
+                 , text_col:str = None
+                 , id_col:str = None 
+                 , index_outpath: str = None
+                 , cross_encoder_model_name: str = None
+                 ):
+        """_summary_
 
         Args:
-            data: List of input sentences.
-
-        Returns:
-            Numpy array of encoded sentences.
+            data (pd.DataFrame): dataframe containing text we want to index, and the doc2text mapping columns 
+            model (sentence_transformers.SentenceTransformer): the sentence transformer to use in generating embeddings. The transformer should be one geared for the task assocaited with the index (information retrieval , semantic search, q&a, etc....)
+            embed_dim (int): dimensions (ex. 768) of the transformer model being used
+            text_col (str): the name of the text field in the dataframe to model  
+            id_col (str, optional): the column in the dataframe to use as a named index on the output FAISS index 
+            index_outpath (str, optional): location to save '.index' file to use for post trained index queries
+            cross_encoder_model_name (str, optional): _description_. Defaults to None.
         """
-        embeddings = self.model.encode(data)
-        self.hashmap_index_sentence = self.index_to_sentence_map(data)
-        return embeddings.astype("float32")
-
-    def build_index(self, embeddings: np.ndarray) -> None:
-        """Build the index for FAISS search.
-
-        Args:
-            embeddings: Numpy array of encoded sentences.
-        """
-        n_data_points = len(embeddings)
-        if (
-            n_data_points >= 1500
-        ):  # Adjust this value based on the minimum number of data points required for IndexIVFPQ
-            self.quantizer = faiss.IndexFlatL2(self.dimension)
-            n_clusters = self.calculate_clusters(n_data_points)
-            self.index = faiss.IndexIVFPQ(
-                self.quantizer, self.dimension, n_clusters, 8, 4
-            )
-            logging.info("IndexIVFPQ created with %d clusters", n_clusters)
+        self.data=data
+        self.model=model
+        self._text_col = text_col
+        self._id_col = id_col
+        self._embed_dim= embed_dim 
+        self._index_outpath = index_outpath
+        self._cross_encoder_model_name = cross_encoder_model_name
+        
+        self._ids = None
+        if cross_encoder_model_name is not None:  
+            self._ce = CrossEncoder(cross_encoder_model_name)
         else:
-            self.index = faiss.IndexFlatL2(self.dimension)
-            logging.info("IndexFlatL2 created")
-
-        if isinstance(self.index, faiss.IndexIVFPQ):
-            self.index.train(embeddings)
-        self.index.add(embeddings)
-        logging.info("Index built on device: %s", self.device)
-
-    @staticmethod
-    def index_to_sentence_map(data: List[str]) -> Dict[int, str]:
-        """Create a mapping between index and sentence.
-
-        Args:
-            data: List of sentences.
-
-        Returns:
-            Dictionary mapping index to the corresponding sentence.
+            self._ce = None 
+            
+    def index(self):
+        """create initial index 
         """
-        return {index: sentence for index, sentence in enumerate(data)}
+        #encode data passages using trained bi-encoder  
+        encoded_data = self.model.encode(
+            self.data[self._text_col].values.tolist())
+        encoded_data = np.asarray(encoded_data.astype('float32'))
+        self._ids = [(idx,v) for idx,v in enumerate(self.data[self._id_col])]
+        
+        #note only indexflatIP and indexFlatL2 gaurentee exact results (no clustering)
+        self.index = faiss.IndexIDMap(
+            faiss.IndexFlatIP(self._embed_dim))
+        
+        #add contextual index to faiss 
+        self.index.add_with_ids(encoded_data , [__id[0] for __id in self._ids])
+        
+        #write faiss index to disk 
+        if self._index_outpath is not None: 
+            assert self._index_outpath.split('.')[-1] =='index', 'you must save index to .index file extension'
+            faiss.write_index(self.index, self._index_outpath)
+        
+        
+    def fetch(self,idx,sim_score):
+        info = self.data.iloc[idx]
+        
+        meta_dict = {}
+        #meta_dict[f"{self._text_col}_{sim_score}"] = info[self._text_col]
+        meta_dict[f"{info[self._id_col]}"] = {'text':info[self._text_col]
+                                              ,'score': sim_score
+                                              }
+               
+        print(meta_dict)
+        return meta_dict
 
-    @staticmethod
-    def get_top_sentences(
-        index_map: Dict[int, str], top_indices: np.ndarray
-    ) -> List[str]:
-        """Get the top sentences based on the indices.
+    def cross_encode_fetched(self,query, biencoder_results):
+        
+        assert self._ce is not None, 'you must have a defined and compiled cross encoder model to use this function'
+        #format data for input to cross encoder
+        ce_in = [[query, _d[next(iter(_d))]['text']] for _d in biencoder_results  ]
 
-        Args:
-            index_map: Dictionary mapping index to the corresponding sentence.
-            top_indices: Numpy array of top indices.
+        #re-rank embeddings from bi-encoder using cross encoder
+        cross_scores = self._ce.predict(ce_in)
+        
+        #return ranked list of cross encoder scores 
 
-        Returns:
-            List of top sentences.
-        """
-        return [index_map[i] for i in top_indices]
-
-    def search(self, input_sentence: str, top: int) -> Tuple[np.ndarray, np.ndarray]:
-        """Compute cosine similarity between an input sentence and a collection of sentence embeddings.
-
-        Args:
-            input_sentence: The input sentence to compute similarity against.
-            top: The number of results to return.
-
-        Returns:
-            A tuple containing two numpy arrays. The first array contains the cosine similarities between the input
-            sentence and the embeddings, ordered in descending order. The second array contains the indices of the
-            corresponding embeddings in the original array, also ordered by descending similarity.
-        """
-        vectorized_input = self.model.encode(
-            [input_sentence], device=self.device
-        ).astype("float32")
-        D, I = self.index.search(vectorized_input, top)
-        return I[0], 1 - D[0]
-
-    def save_index(self, file_path: str) -> None:
-        """Save the FAISS index to disk.
-
-        Args:
-            file_path: The path where the index will be saved.
-        """
-        if hasattr(self, "index"):
-            faiss.write_index(self.index, file_path)
+        return [(cross_scores[hit] ,"\t{}".format(biencoder_results[hit][next(iter(biencoder_results[hit]))]['text'].replace("\n", " "))) 
+                for hit in np.argsort(np.array(cross_scores))[::-1]]
+    
+    def search(self,query, top_k, refine_with_crossencoder=False):
+        t=time.time()
+        query_vector = self.model.encode([query])
+        top_k = self.index.search(query_vector, top_k)
+        print('>>>> Results in Total Time: {}'.format(time.time()-t))
+        print(top_k)
+        
+        top_k_ids = top_k[1].tolist()[0]
+        top_k_sims = top_k[0].tolist()[0]
+        top_k_ids = list(np.unique(top_k_ids))
+        print(top_k_ids)
+        print(top_k_sims)
+       
+        results =  [self.fetch(id, top_k_sims[idx]) for idx,id in enumerate(top_k_ids)]
+        #results =  [f"{top_k_sims[idx]}_{self.fetch(idx)}" for idx in top_k_ids]
+        
+        if refine_with_crossencoder==False: 
+            return results, top_k_ids
         else:
-            raise AttributeError(
-                "The index has not been built yet. Build the index using `build_index` method first."
-            )
-
-    def load_index(self, file_path: str) -> None:
-        """Load a previously saved FAISS index from disk.
-
-        Args:
-            file_path: The path where the index is stored.
-        """
-        if os.path.exists(file_path):
-            self.index = faiss.read_index(file_path)
-        else:
-            raise FileNotFoundError(f"The specified file '{file_path}' does not exist.")
-
-    @staticmethod
-    def measure_time(func: Callable, *args, **kwargs) -> Tuple[float, Any]:
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        return elapsed_time, result
-
-    @staticmethod
-    def measure_memory_usage() -> float:
-        process = psutil.Process(os.getpid())
-        ram = process.memory_info().rss
-        return ram / (1024**2)
-
-    def timed_train(self, data: List[str]) -> Tuple[float, float]:
-        start_time = time.time()
-        embeddings = self.encode(data)
-        self.build_index(embeddings)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        memory_usage = self.measure_memory_usage()
-        logging.info(
-            "Training time: %.2f seconds on device: %s", elapsed_time, self.device
-        )
-        logging.info("Training memory usage: %.2f MB", memory_usage)
-        return elapsed_time, memory_usage
-
-    def timed_infer(self, query: str, top: int) -> Tuple[float, float]:
-        start_time = time.time()
-        _, _ = self.search(query, top)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        memory_usage = self.measure_memory_usage()
-        logging.info(
-            "Inference time: %.2f seconds on device: %s", elapsed_time, self.device
-        )
-        logging.info("Inference memory usage: %.2f MB", memory_usage)
-        return elapsed_time, memory_usage
-
-    def timed_load_index(self, file_path: str) -> float:
-        start_time = time.time()
-        self.load_index(file_path)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        logging.info(
-            "Index loading time: %.2f seconds on device: %s", elapsed_time, self.device
-        )
-        return elapsed_time
+            return self.cross_encode_fetched(  query
+                                      , results)

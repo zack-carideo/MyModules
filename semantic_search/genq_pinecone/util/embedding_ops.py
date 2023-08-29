@@ -84,7 +84,6 @@ class query_ops:
                                 ):
         
         """takes a list of passages and executes the below steps 
-        
         1. encode all passages and return pytorch tensors
         2. generate output tokens from input embeddings (aka generate n queries linked to  each passage) 
         3. decode output  tokens into human readable text 
@@ -92,7 +91,7 @@ class query_ops:
         5. save all query , passage pairs to disk 
         
         Args:
-            list_of_texts (List): list of passages you with to generate n queries for each 
+            list_of_texts (List): list of passages you with to generate n queries for each   list_of_texts = [(doc #, text), (doc #, text), ... , ]
         """
         
         assert self._out_dir is not None, 'please specificy output directory to save embedded text'
@@ -112,8 +111,11 @@ class query_ops:
                 torch.cuda.empty_cache()
                 gc.collect()
         
+                #extract docs
+                docs = [p_[0] for p_ in p ]
+                
                 #clean tabs 
-                p = [p_.replace('\t', ' ') for p_ in p]
+                p = [p_[1].replace('\t', ' ') for p_ in p]
                 
                 # encode input tokens and return as pytorch tennsors
                 # ENCODE THE TOKENIZED PASSAGE THAT YOU WANT TO GENERATE QUIERIES FOR 
@@ -129,11 +131,32 @@ class query_ops:
                 # create  mapping of passages to chunks (for audit policy tracking)
                 # decoding because the tokenizer generated a sliding window wwith span 
                 # that we must keep track of to keep doc to chunk alignment 
-                passage2chunk_map =[{'text':a,'doc':b} for a,b in 
-                    zip(*[self._tokenizer.batch_decode(input_ids.input_ids),
-                        input_ids['overflow_to_sample_mapping']])
-                    ]
+                # passage2chunk_map =[{'text':a,'doc':docs[b]} for a,b in 
+                #     zip(*[self._tokenizer.batch_decode(input_ids.input_ids),
+                #         input_ids['overflow_to_sample_mapping']])
+                #     ]
                 
+                passage2chunk_map = []
+                _lastdoc = None
+                idxx = 0 
+                for idx,tup in enumerate(zip(*[self._tokenizer.batch_decode(input_ids.input_ids),input_ids['overflow_to_sample_mapping']])):
+                    
+                    #inter document chunk index (must be a better way!)
+                    if idx==0:
+                        _lastdoc = tup[1]
+                    else:
+                        #if current doc == last , add 1 to doc chunk iderator
+                        if tup[1]==_lastdoc:
+                            idxx = idxx+1
+                        else:
+                            idxx=0
+                            _lastdoc = tup[1]  
+                            
+                    #create map of each text, its doc index, and the respect doc chunk
+                    passage2chunk_map.append({'text':tup[0],'doc':docs[tup[1]] , 'chunk':idxx})
+                
+    
+        
                 
                 #generate queries 
                 outputs = self._model.generate(
@@ -193,17 +216,23 @@ class query_ops:
             
             #clean up any reamaining 
             if len(scored_df_list)>0:
-                out_p = f'{self._out_dir}/pairs_{file_count}.pq'
+                out_p = f'{self._out_dir}\pairs_{file_count}.pq'
                 pd.concat(scored_df_list).to_parquet(out_p)
                 self._query_passage_outpaths.append(out_p)
 
-        self._passage2chunk_map = passage2chunk_map
+        #self._passage2chunk_map = passage2chunk_map
         
         return [v for v in self._query_passage_outpaths]
 
 
 
-    def create_training_data(self,query_passage_outpaths: list = None):
+    def create_training_data(self
+                             ,query_passage_outpaths: list = None
+                             , query_col = 'ec_query_txt'
+                             , passage_col = 'text'
+                             , passage_idx_col = 'doc'
+                             , passage_chunk_idx_col = 'chunk'
+                             ):
         
         """create a sentence_transformer training dataset of query,passage pairs to use in fine tunning a LLM  
         
@@ -214,8 +243,22 @@ class query_ops:
         
         if query_passage_outpaths is None: 
             query_passage_outpaths = self._query_passage_outpaths
-            
-        return [(x['ec_query_txt'],x['text']) 
-                 for idx, x in pd.concat([pd.read_parquet(p) 
-                                          for p in self._query_passage_outpaths]).iterrows()
-                 ]
+        
+        
+        #create df, and use original index as doc chunk idx 
+        #df['chunk_idx'] = df.groupby(['doc']).cumcount()+1
+        df = pd.concat([pd.read_parquet(p) for p in self._query_passage_outpaths]
+                       ).reset_index(drop=True)#.rename(columns={'index':passage_chunk_idx_col})
+        
+        #create single index col 
+        df['_index'] = df[passage_idx_col].astype(str) + '_' + df[passage_chunk_idx_col].astype(str)
+        #update passage to include location informatin within text
+        df['passage'] = df['_index'] +":"+df[passage_col]
+        
+        
+        pairs = [(_d[query_col] 
+                          ,_d['passage']) 
+                         for idx,_d in df.iterrows()]
+        
+        return df , pairs 
+
