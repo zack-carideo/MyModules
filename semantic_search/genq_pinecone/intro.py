@@ -2,6 +2,7 @@ import sys,os,logging, gc
 import pandas as pd
 from pathlib import Path
 from transformers import AutoTokenizer, T5Tokenizer,T5TokenizerFast, T5ForConditionalGeneration
+from sentence_transformers import util 
 import torch 
 #set up basic logging
 logging.basicConfig()
@@ -18,7 +19,7 @@ from util.misc import LoadCFG, seed_all
 from util.data import load_data
 from util.embedding_ops import query_ops
 from util.model_ops import build_model 
-from util.index_ops import ScalableSemanticSearch
+from util.index_ops import faiss_index 
 
 #set seed 
 SEED = 42
@@ -36,6 +37,7 @@ BI_ENCODER_MODEL_NAME = cfg.model.bi_encoder.model_name
 EPOCHS = cfg.model.n_epochs
 BI_ENCODER_BATCH_SIZE =  cfg.model.bi_encoder.batch_size
 
+CROSS_ENCODER_MODEL_NAME = cfg.model.cross_encoder.model_name
 
 #device setup
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -55,7 +57,7 @@ N_QUERIES_PER_PASSAGE =  cfg.model.query_gen.n_queries_per_passage
 #clean up gpu 
 torch.cuda.empty_cache()
 gc.collect()
-logger.info(torch.cuda.memory_summary(device='cuda', abbreviated=True))
+logger.info(torch.cuda.memory_summary(device=device, abbreviated=True))
 
 #create output folder if it doesnt exist
 if not SAVE_DIR.is_dir():
@@ -86,7 +88,8 @@ df = load_data( load_from_directory=False
 # we want to emulate the scenario in which we do not have queries. 
 # We will remove all but the 'context' data to do that. (aka all that is passed into framework is list of text)
 logging.info('extracting text passages to generate queries for')
-passages = list(set(df['context']))[:NSAMPS]
+passages = list(set(df['context']))[2300:2300+ NSAMPS]
+passages = [(idx,txt) for idx,txt in enumerate(passages)]
 print(len(passages))
 
 #Generate queries from passages to use to generate syntheic key,value pairs of (Questions, Awnsers) 
@@ -126,10 +129,12 @@ queryer = query_ops(
 #generate query,passage key value pairs , save to disk , return paths 
 logger.info('generating query, passage key value pairs')
 query_passage_outpaths = queryer.gen_queries_from_passages(passages)
-
+                  
 #create sentence_transformers comptable training dataset using InputExample() method from transformers
 logger.info('creating training data for bi-encoder fine tuning')
-pairs = queryer.create_training_data( query_passage_outpaths)
+
+#create train df, including docidx, and chunk idx information
+train_df , pairs= queryer.create_training_data( query_passage_outpaths)
 
 #create object to handle loading of InputExample() instances in batches of 50 
 logger.info('creating loader to handle loading batches of data for model training')
@@ -137,16 +142,59 @@ logger.info('creating loader to handle loading batches of data for model trainin
 #build and train the bi-encoder to be used for asymetric search (information retrieval)
 #the trained model will encode passages into embeddings that are trained to be queried via short questions (as oppposed to just blindly taking the cossime between a short a long seq of text)
 logger.info('building model')
-ir_model = build_model(pairs
+ir_model  = build_model(pairs
                     , BI_ENCODER_MODEL_NAME
                     , str(MODEL_SAVE_DIR / 'fine_tuned_biencoder')
                     , epochs=EPOCHS
                     , batch_size = BI_ENCODER_BATCH_SIZE
                     )
 
+#build index to encode a fast query trained asyemetric embeddings
+ir_model.eval()
+
+#create passage embeddings using the  new fine tuned bi - encoder
+#define index object parameters
+f_idx = faiss_index(train_df[['_index','passage']].drop_duplicates().reset_index(drop=True) #df
+                    , ir_model #model
+                    , ir_model[1].word_embedding_dimension
+                    , text_col = 'passage'
+                    , id_col = '_index'
+                    , index_outpath = None
+                    , cross_encoder_model_name = CROSS_ENCODER_MODEL_NAME
+                    )
+#create index
+f_idx.index()
 
 
-#build serachable index from all trained docs 
-input_ids = queryer._tokenizer('where is egypt?',return_tensors='pt').input_ids
-outputs = model.generate(input_ids)
-print( queryer._tokenizer.decode(outputs[0], skip_special_tokens=True)
+#search index 
+query_ = 'where is Ann Arbor?'
+results = f_idx.search(query_,4, refine_with_crossencoder=True)
+
+
+
+
+###
+### CHEAP ALTERNATE INBUILT UTIILS TO EXZECUTE COSSIM
+###
+##query
+# query_ = 'who is lady chapel?'
+# query_emb = ir_model.encode(query_, convert_to_tensor=True)
+
+# # We use cosine-similarity and torch.topk to find the highest 5 scores
+# cos_scores = util.cos_sim(query_emb.to('cpu'), ir_doc_embeds)[0]
+# top_results = torch.topk(cos_scores, k=6)
+
+# print("\n\n======================\n\n")
+# print("Query:", query_)
+# print("\nTop 5 most similar sentences in corpus:")
+
+# for score, idx in zip(top_results[0], top_results[1]):
+#     print(pairs[idx], "(Score: {:.4f})".format(score))
+
+
+
+
+
+# outputs = ir_model.encode([torch.Tensor(input_ids).type(torch.int64)])
+# torch.Tensor(input_ids.input_ids).type(torch.int64).to('cuda')
+# print( queryer._tokenizer.decode(outputs[0], skip_special_tokens=True))
