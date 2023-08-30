@@ -163,14 +163,13 @@ query_ = 'where is Ann Arbor?'
 results = f_idx.search(query_,4, refine_with_crossencoder=True)
 
 
-#del index and load 
+#del index and load to verify we can load static index and continue to query 
 del f_idx
 
 index_ ,data,_ids = faiss_index.load_index(index_outp, data_outp, id_outp)
 _ce = CrossEncoder(CROSS_ENCODER_MODEL_NAME)
 faiss_index.static_search(index_
                       , ir_model
-
                       , query_
                       , 5 
                       , data

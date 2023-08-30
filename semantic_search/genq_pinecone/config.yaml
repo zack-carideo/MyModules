@@ -8,14 +8,14 @@ model:
   model_save_dir: "C:/Users/zjc10/Desktop/Projects/data/semantic_search/models"
   llm_model_name:  'BeIR/query-gen-msmarco-t5-large-v1'
   bi_encoder_model_name: 'msmarco-distilroberta-base-v3' #msmarco-distilbert-base-v2#'microsoft/mpnet-base'
-  n_epochs: 2
-  n_samps: 20
+  n_epochs: 1
+  n_samps: 1000
 
   tokenizer: 
     return_tensors: 'pt'
     padding: 'max_length'
     return_overflow_tokens: True
-    max_seq_len: 150
+    max_seq_len: 200
     truncation: True
     stride: 60
     batch_size: 10

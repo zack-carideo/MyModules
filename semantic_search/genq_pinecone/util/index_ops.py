@@ -145,7 +145,7 @@ class faiss_index:
         print(top_k_ids)
         print(top_k_sims)
        
-        results =  [self.fetch(self.data
+        results =  [faiss_index.fetch(self.data
                                , id
                                , self._id_col
                                , self._text_col
@@ -157,13 +157,12 @@ class faiss_index:
         if refine_with_crossencoder==False: 
             return results, top_k_ids
         else:
-            return self.cross_encode_fetched(  self._ce
+            return faiss_index.cross_encode_fetched(  self._ce
                                              , query
                                              , results)
     @staticmethod
     def static_search(_index
                       , model: 'bi-encoder'
-
                       , query: str 
                       , top_k: int 
                       , data: pd.DataFrame
