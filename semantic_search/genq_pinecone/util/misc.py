@@ -1,9 +1,30 @@
-import os , sys, random, yaml
+import os , sys, random, yaml, logging
 import numpy as np 
 from types import SimpleNamespace
 from pathlib import Path
 from typing import Tuple 
 
+#set up basic logging
+logging.basicConfig()
+logging.getLogger().setLevel(logging.INFO)
+logger =  logging.getLogger(__name__)
+
+def create_output_dirs(SAVE_DIR, MODEL_SAVE_DIR):
+        
+    #create output folder if it doesnt exist
+    if not SAVE_DIR.is_dir():
+        assert (not SAVE_DIR.is_file()), f'a directory to save outputs must be passed, you passed a full file path: {save_dir}'
+        if not SAVE_DIR.parent.is_dir(): 
+            os.mkdir(str(SAVE_DIR.parent))
+            os.mkdir(str(SAVE_DIR))
+        else:
+            os.mkdir(str(SAVE_DIR))
+        logger.info(f"new output directory created:{SAVE_DIR}")
+
+    if not MODEL_SAVE_DIR.is_dir():
+        assert SAVE_DIR.parent.is_dir(), f'parent directory: {SAVE_DIR} does not exist'
+        os.mkdir(str(MODEL_SAVE_DIR))
+        
 def check_if_file_exists(file_path: Path) -> Tuple[bool,str]:
     """
     check if file exists

@@ -2,7 +2,7 @@ import sys,os,logging, gc
 import pandas as pd
 from pathlib import Path
 from transformers import AutoTokenizer, T5Tokenizer,T5TokenizerFast, T5ForConditionalGeneration
-from sentence_transformers import util 
+from sentence_transformers import util , CrossEncoder
 import torch 
 #set up basic logging
 logging.basicConfig()
@@ -15,10 +15,10 @@ cfg_path = Path(root_) / "config.yaml"
 
 #custom imports
 sys.path.append(root_)
-from util.misc import LoadCFG, seed_all
+from util.misc import LoadCFG, seed_all, create_output_dirs
 from util.data import load_data
 from util.embedding_ops import query_ops
-from util.model_ops import build_model 
+from util.model_ops import build_model , load_model
 from util.index_ops import faiss_index 
 
 #set seed 
@@ -30,49 +30,39 @@ cfg = LoadCFG(cfg_path, base_dir = root_).load()
 DATA_PATH = cfg.data.input.data_path
 SAVE_DIR = Path(cfg.data.output.data_save_dir)
 MODEL_SAVE_DIR = Path(cfg.model.model_save_dir)
+INDEX_SAVE_DIR = Path(cfg.model.ir.faiss_index.out_dir)
 
 NSAMPS = cfg.model.n_samps
 TOK_BATCH_SIZE = cfg.model.tokenizer.batch_size
-BI_ENCODER_MODEL_NAME = cfg.model.bi_encoder.model_name
+BI_ENCODER_MODEL_NAME = cfg.model.ir.bi_encoder.model_name
 EPOCHS = cfg.model.n_epochs
-BI_ENCODER_BATCH_SIZE =  cfg.model.bi_encoder.batch_size
-
-CROSS_ENCODER_MODEL_NAME = cfg.model.cross_encoder.model_name
-
-#device setup
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+BI_ENCODER_BATCH_SIZE =  cfg.model.ir.bi_encoder.batch_size
+CROSS_ENCODER_MODEL_NAME = cfg.model.ir.cross_encoder.model_name
 
 #tokenizer setup
-return_tensors = cfg.model.tokenizer.return_tensors
-padding =  cfg.model.tokenizer.padding
-return_overflow_tokens= cfg.model.tokenizer.return_overflow_tokens
-max_seq_len = cfg.model.tokenizer.max_seq_len
-truncation = cfg.model.tokenizer.truncation 
-stride = cfg.model.tokenizer.stride 
+RETURN_TENSORS = cfg.model.tokenizer.return_tensors
+PADDING =  cfg.model.tokenizer.padding
+RETURN_OVERFLOW_TOKENS= cfg.model.tokenizer.return_overflow_tokens
+MAX_SEQ_LEN = cfg.model.tokenizer.max_seq_len
+TRUNCATION = cfg.model.tokenizer.truncation 
+STRIDE = cfg.model.tokenizer.stride 
 
 #query generator setup
 GENQ_MODEL_NAME = cfg.model.query_gen.model_name 
 N_QUERIES_PER_PASSAGE =  cfg.model.query_gen.n_queries_per_passage 
 
+#device
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 #clean up gpu 
 torch.cuda.empty_cache()
 gc.collect()
-logger.info(torch.cuda.memory_summary(device=device, abbreviated=True))
+logger.info(torch.cuda.memory_summary(device=DEVICE, abbreviated=True))
 
-#create output folder if it doesnt exist
-if not SAVE_DIR.is_dir():
-    assert (not SAVE_DIR.is_file()), f'a directory to save outputs must be passed, you passed a full file path: {save_dir}'
-    if not SAVE_DIR.parent.is_dir(): 
-        os.mkdir(str(SAVE_DIR.parent))
-        os.mkdir(str(SAVE_DIR))
-    else:
-        os.mkdir(str(SAVE_DIR))
-    logger.info(f"new output directory created:{SAVE_DIR}")
+#create output dirs
+create_output_dirs(SAVE_DIR, MODEL_SAVE_DIR)
 
-if not MODEL_SAVE_DIR.is_dir():
-    assert SAVE_DIR.parent.is_dir(), f'parent directory: {SAVE_DIR} does not exist'
-    os.mkdir(str(MODEL_SAVE_DIR))
-
+    
 ##
 ##
 ##
@@ -105,9 +95,8 @@ tokenizer = T5TokenizerFast.from_pretrained(GENQ_MODEL_NAME, do_lower_case=False
 #call eval() to force / ensure model is running in 'INFERENCE MODE' and not 'TRAINING' mode
 logger.info('forcing model into eval mode')
 qgen_model.eval()
-model = qgen_model.to(device)
-#tokenizer = tokenizer
-print(device)
+model = qgen_model.to(DEVICE)
+print(DEVICE)
 
 #initalize class to generate queries from passages
 logger.info('initalize embedding querier')
@@ -118,12 +107,12 @@ queryer = query_ops(
     , n_queries_per_passage = N_QUERIES_PER_PASSAGE
     , save_batch_size = 1000
     , train_batch_size = TOK_BATCH_SIZE    
-    , return_tensors = return_tensors
-    , padding =  padding
-    , return_overflowing_tokens= return_overflow_tokens
-    , max_seq_len = max_seq_len
-    , truncation = truncation 
-    , stride = stride 
+    , return_tensors = RETURN_TENSORS
+    , padding =  PADDING
+    , return_overflowing_tokens= RETURN_OVERFLOW_TOKENS
+    , max_seq_len = MAX_SEQ_LEN
+    , truncation = TRUNCATION 
+    , stride = STRIDE 
     )
 
 #generate query,passage key value pairs , save to disk , return paths 
@@ -149,8 +138,11 @@ ir_model  = build_model(pairs
                     , batch_size = BI_ENCODER_BATCH_SIZE
                     )
 
+del ir_model
 #build index to encode a fast query trained asyemetric embeddings
+ir_model = load_model(str(MODEL_SAVE_DIR / 'fine_tuned_biencoder'), DEVICE)
 ir_model.eval()
+
 
 #create passage embeddings using the  new fine tuned bi - encoder
 #define index object parameters
@@ -159,17 +151,32 @@ f_idx = faiss_index(train_df[['_index','passage']].drop_duplicates().reset_index
                     , ir_model[1].word_embedding_dimension
                     , text_col = 'passage'
                     , id_col = '_index'
-                    , index_outpath = None
+                    , index_outpath = INDEX_SAVE_DIR
                     , cross_encoder_model_name = CROSS_ENCODER_MODEL_NAME
                     )
 #create index
-f_idx.index()
+index_outp , data_outp, id_outp = f_idx.create_index()
 
 
 #search index 
 query_ = 'where is Ann Arbor?'
 results = f_idx.search(query_,4, refine_with_crossencoder=True)
 
+
+#del index and load 
+del f_idx
+
+index_ ,data,_ids = faiss_index.load_index(index_outp, data_outp, id_outp)
+_ce = CrossEncoder(CROSS_ENCODER_MODEL_NAME)
+faiss_index.static_search(index_
+                      , ir_model
+
+                      , query_
+                      , 5 
+                      , data
+                      , '_index'
+                      , 'passage'
+                      , _ce = _ce)
 
 
 

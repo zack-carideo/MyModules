@@ -90,7 +90,9 @@ def build_model(query_passage_pairs
                 ,bi_encoder_model_name
                 , model_outpath 
                 , epochs=3
-                , batch_size = 2):
+                , batch_size = 2
+                , save_best_model = True
+                ):
     
     #create data loader 
     loader = gen_model_data_loader( query_passage_pairs
@@ -110,13 +112,13 @@ def build_model(query_passage_pairs
        , warmup_steps = warmup_steps
        , output_path = model_outpath
        , show_progress_bar = True
-
-
+       #, save_best_model = True
     )
 
     return model 
+
+
+def load_model(model_path, device):
     
-    
-    
-    
+    return SentenceTransformer(model_path, device=device)
     
