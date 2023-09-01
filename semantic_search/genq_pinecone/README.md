@@ -1,4 +1,4 @@
-#### E2E Demo Augmented Query Geneation and Semantic Search with Cross Encoder refinement
+#### E2E Demo Augmented Query Geneation and Asymetric  Search with Cross Encoder refinement
 
     0) Tokenization of long passages using window and stride
         - 
