@@ -13,6 +13,12 @@
         - 'cross-encoder/ms-marco-TinyBERT-L-2-v2' 
 
 
+### Run Instructions 
+- **Option 1(run from terminal)**: python intro.py
+- **Option 2(Interactive)**: demo.ipynb 
+    -    demo.py walks through  process used to link original text chunks to post tokenized spanning chunks and provides examples how data after each step of the framework 
+
+
 
 ### RESOURCES 
 - THIS MODULE IS A Variant of the IMPLEMENTATION PROVIDED HERE: https://www.pinecone.io/learn/series/nlp/genq/
