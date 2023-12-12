@@ -2,20 +2,69 @@
 # Import the necessary modules
 #chromadb (vector database)
 import chromadb, os, sys, bs4
-
+from pathlib import Path 
 
 # Define the list of retrievers
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.vectorstores import Chroma
 from langchain.retrievers.merger_retriever import MergerRetriever
-
+from langchain.document_transformers import LongContextReorder, EmbeddingsClusteringFilter
+from langchain.retrievers.document_compressors import DocumentCompressorPipeline
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.document_transformers import LongContextReorder
+from langchain.document_transformers import (
+    EmbeddingsClusteringFilter,
+    EmbeddingsRedundantFilter,
+)
 from pathlib import Path
 from os.path import expanduser
-
+from langchain.chains.summarize import load_summarize_chain
 #get data to test demo with 
 import bs4
 from langchain.document_loaders import WebBaseLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+#generate responses for original input queries based on output from compression_retriever (IR)
+from langchain.callbacks.manager import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.llms import LlamaCpp
+import os
+from langchain.callbacks.manager import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.chains import LLMChain
+from langchain.llms import LlamaCpp
+from langchain.prompts import PromptTemplate
+from langchain.callbacks.manager import CallbackManager
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.llms import LlamaCpp
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
+#from huggingface_hub import snapshot_download, hf_hub_download 
+#from functools import partial
+#from langchain_core.prompts import format_document
+
+
+from langchain.prompts import PromptTemplate
+from langchain.schema import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough # RunnableParallel,
+from langchain.docstore.document import Document
+
+n_gpu_layers = 1  # Metal set to 1 is enough.
+n_batch = 512  # Should be between 1 and n_ctx, consider the amount of RAM of your Apple Silicon Chip.
+callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+
+#model informatoin and download settings
+repo_id = "shaowenchen/llama-2-7b-langchain-chat-gguf"
+filename = 'llama-2-7b-langchain-chat.Q4_K.gguf'
+repo_type = "model"
+local_dir = "/home/zjc1002/Mounts/llms/llama-2-7b-langchain-chat-gguf"
+local_dir_use_symlinks = False
+modelpath = Path(local_dir, filename) 
+model_path = expanduser(modelpath)
+#model memory settings
+n_gpu_layers = 4 # Change this value based on your model and your GPU VRAM pool.
+n_batch = 10    # Should be between 1 and n_ctx, consider the amount of VRAM in your GPU.
+
 
 #config 
 #testing chroma db access
@@ -34,7 +83,7 @@ db_info = [{'db_name':'mini'
            , "collection_meta":{"hnsw:space": "cosine"}
            , "persist_directory": f"{db_dir}/mini_tst"
            , "search_type": "similarity"
-           , "search_kwargs": {"k":3, "include_metadata": True}
+           , "search_kwargs": {"k":2, "include_metadata": True}
            , "filter":False
 
            }
@@ -44,7 +93,7 @@ db_info = [{'db_name':'mini'
            , "collection_meta":{"hnsw:space": "cosine"}
            , "persist_directory": f"{db_dir}/miniqa_tst"
            , "search_type": "similarity"
-           , "search_kwargs": {"k":3, "include_metadata": True}
+           , "search_kwargs": {"k":2, "include_metadata": True}
            , "filter":False
            }
            , {'db_name':'bge'
@@ -53,7 +102,7 @@ db_info = [{'db_name':'mini'
            , "collection_meta":{"hnsw:space": "cosine"}
            , "persist_directory": f"{db_dir}/bge_tst"
            , "search_type": "similarity"
-           , "search_kwargs": {"k":3, "include_metadata": True}
+           , "search_kwargs": {"k":2, "include_metadata": True}
            , "filter":False
            }
            , {'db_name':'gpt2'
@@ -64,8 +113,8 @@ db_info = [{'db_name':'mini'
            ]
 
 #doc tokenization settings
-doc_split_info = {'chunk_size':1000
-                  , 'chunk_overlap':200}
+doc_split_info = {'chunk_size':512
+                  , 'chunk_overlap':100}
 
 ###
 ###START 
@@ -90,8 +139,6 @@ text_splitter = RecursiveCharacterTextSplitter(chunk_size=doc_split_info['chunk_
                                                )
 splits = text_splitter.split_documents(docs)
 print(len(splits))
-
-
 
 
 #load embeddings to use as retrievers
@@ -132,27 +179,18 @@ lotr = MergerRetriever(retrievers=[retrvr for retrvr in vecindex_retrievers.valu
 
 #the big model 
 filter_embeddings = [embeddings_[_db['model_name']] 
-for _db in db_info if _db['filter'] == True][0]
+                     for _db in db_info if _db['filter'] == True][0]
 filter_embeddings.client.tokenizer.pad_token = filter_embeddings.client.tokenizer.eos_token
-
-#filter_embeddings = HuggingFaceEmbeddings(model_name="gpt2"
-#                                    , model_kwargs = {"device":"cuda"}
-#                                    , cache_folder=llm_dir
-#                                    )
 
 
 # We can remove redundant results from both retrievers using yet another embedding.
 # Using multiples embeddings in diff steps could help reduce biases.
 # If you want the final document to be ordered by the original retriever scores
 # you need to add the "sorted" parameter.
-from langchain.document_transformers import LongContextReorder, EmbeddingsClusteringFilter
-from langchain.retrievers.document_compressors import DocumentCompressorPipeline
-from langchain.retrievers import ContextualCompressionRetriever
-
 filter_ordered_by_retriever = EmbeddingsClusteringFilter(
     embeddings=filter_embeddings,
-    num_clusters=5,
-    num_closest=2,
+    num_clusters=3,
+    num_closest=1,
     sorted=True,
 )
 
@@ -162,29 +200,20 @@ filter_ordered_by_retriever = EmbeddingsClusteringFilter(
 # information before making a similarity search or any kind of search. The compression is related to both 
 # the data compression within the document and document compression from the pool of data:
 # You can use an additional document transformer to reorder documents after removing redundance.
-from langchain.document_transformers import LongContextReorder
-from langchain.document_transformers import (
-    EmbeddingsClusteringFilter,
-    EmbeddingsRedundantFilter,
-)
 #filter = EmbeddingsRedundantFilter(embeddings=filter_embeddings)
 reordering = LongContextReorder()
-pipeline = DocumentCompressorPipeline(transformers=[ filter_ordered_by_retriever
-,reordering])
+pipeline = DocumentCompressorPipeline(transformers=[ filter_ordered_by_retriever 
+                                                    , reordering]
+                                                    )
+
 compression_retriever = ContextualCompressionRetriever(
     base_compressor=pipeline
     , base_retriever=lotr
     , documents= splits
-)
+    )
 
 
-#gehttps://python.langchain.com/docs/use_cases/question_answering/
-
-
-#generate responses for original input queries
+#print top IR RESULTS (THIS IS NOT GENERATION)
 for _query in query_list: 
     for chunks in compression_retriever.get_relevant_documents(_query):
         print(chunks.page_content)
-
-
-                                                                                                                 
