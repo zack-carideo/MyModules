@@ -1,7 +1,8 @@
 ### This repository (langchain_ops/demos) contains a series of interactive demos to illustrate a variety of LLM-based operations to execute RAG-based components independently and in an end-to-end fashion 
 
-- End-to-End Rag Demos 
-    - **Rag_with_MapReduce.py:**
+- End-to-End Rag Demo 
+
+    - **rag/Rag_with_MapReduce.ipynb:**
         - Objective: illustrate how multiple LLM models can be integrated and used sequentially to efficiently execute each component of the RAG framework within langchain. 
 
         - Core Components 
