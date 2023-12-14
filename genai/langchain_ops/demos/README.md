@@ -3,7 +3,7 @@
 - End-to-End Rag Demo 
 
     - **rag/Rag_with_MapReduce.ipynb:**
-        - Objective: illustrate how multiple LLM models can be integrated and used sequentially to efficiently execute each component of the RAG framework within langchain. 
+        - **Objective:** illustrate how multiple LLM models can be integrated and used sequentially to efficiently execute each component of the RAG framework within langchain using a combination of small retrievers, and highly compressed llamaccp models for geneation. 
 
         - Core Components 
             - **Merged Retriever:** An ensemble of small retrievers is used to index the source document text chunks. each index represents a different models embedding representation of the text. These vector indcies are quried by end user to identify the top n relevant documents associated with an end user's query 
