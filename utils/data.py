@@ -4,6 +4,8 @@ import logging,yaml,os
 import pandas as pd
 import numpy as np 
 from sklearn.model_selection import StratifiedKFold
+import requests , zipfile, io
+
 
 logger = logging.getLogger()
 
@@ -82,3 +84,39 @@ def stratifiedkfold(y,*,n_splits=5, shuffle=True):
         folds[idx] = {'train':train_idx , 'val':val_idx}
     
     return folds, skf
+
+
+
+def download_and_unzip(url: str, destination_folder: str):
+    
+    """
+    Downloads a file from the given URL and extracts its contents to the specified destination folder.
+
+    Args:
+        url (str): The URL of the file to download.
+        destination_folder (str): The path to the folder where the contents of the zip file will be extracted.
+
+    Returns:
+        None
+
+    Raises:
+        None
+    """
+
+    # Send a GET request to download the file
+    response = requests.get(url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+
+        # Read the content of the response
+        content = response.content
+
+        # Create a file-like object from the response content
+        file = io.BytesIO(content)
+
+        # Extract the contents of the zip file
+        with zipfile.ZipFile(file, 'r') as zip_ref:
+            zip_ref.extractall(destination_folder)
+    else:
+        print("Failed to download the file.")

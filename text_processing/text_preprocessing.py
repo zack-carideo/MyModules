@@ -76,7 +76,11 @@ def clean_html_text(text):
     
 #2nd level string cleaning 
 #text processing for modeling (beyond basic input text formatting)
-def clean_sentence(sentence,PUNCTUATION=string.punctuation+"\\\\",stemmer = None, lower=False,stopwords = None):
+def clean_sentence(sentence
+                   , PUNCTUATION=string.punctuation+"\\\\"
+                   , stemmer = None
+                   , lower=False
+                   , stopwords = None):
     sentence = sentence.encode('ascii',errors = 'ignore').decode()
     sentence=re.sub(f'[{PUNCTUATION}]',' ',sentence)
     sentence = re.sub(' {2,}',' ', sentence)
