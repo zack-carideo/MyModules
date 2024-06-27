@@ -8,6 +8,29 @@ import seaborn as sns
 import yake 
 import matplotlib.pyplot as plt
 import textblob
+from sklearn.linear_model import LogisticRegression
+from rouge_score import rouge_scorer
+
+#location of data to evalute
+df_url = 'https://raw.githubusercontent.com/brmson/dataset-sts/master/data/sts/sick2014/SICK_train.txt'
+target_col = 'entailment_judgment'
+text_col1 = 'sentence_A'
+text_col2 = 'sentence_B'
+
+remove_stopwords = True
+remove_punc = True
+lower_text = True
+stem_text = True 
+
+
+scorer = rouge_scorer.RougeScorer(rouge_types = ['rouge1', 'rouge2','rouge3','rouge4','rouge5','rougeL']
+                                  , use_stemmer=True
+                                  , split_summaries=True
+                                  )
+scores = scorer.score('The quick brown fox jumps over the lazy dog',
+                      'The quick brown dog jumps on the log.')
+
+
 
 
 
@@ -47,17 +70,6 @@ PUNC = set(string.punctuation)
 STOPWORDS = stopwords.words('english')
 STEMMER = SnowballStemmer('english')
 
-
-#location of data to evalute
-df_url = 'https://raw.githubusercontent.com/brmson/dataset-sts/master/data/sts/sick2014/SICK_train.txt'
-target_col = 'entailment_judgment'
-text_col1 = 'sentence_A'
-text_col2 = 'sentence_B'
-
-remove_stopwords = True
-remove_punc = True
-lower_text = True
-stem_text = True 
 
 algo_descriptions = {
     "td.Prefix": "Calculates the longest common prefix length between two strings.",
@@ -278,5 +290,5 @@ plt.show()
 
 
 #add logistic regression model to predict target of duplication. 
-from sklearn.linear_model import LogisticRegression
+
 #START HERE
