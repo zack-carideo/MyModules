@@ -1,0 +1,67 @@
+
+data: 
+  df_inpath:
+  target_col: None #'entailment_judgment'
+  text_col1: 'text1'
+  text_col2: 'text2'
+  index_col1: 'index1'
+  index_col2: 'index2'
+  target_col: 'target'
+preprocessing: 
+  remove_stopwords: True
+  remove_punc: True
+  lower_text: True
+  stem_text: True
+  eval_keywords: False
+  df_outpath: '/home/zjc1002/Downloads/temp_data/processed_data.pq'
+model: 
+  train_model: True
+  train_params:
+    max_iters: 10
+    n_cv: 3
+    min_features: 5
+    max_depth: 2
+    stop_tol: .05
+    learning_rate: .5
+    n_estimators: 100
+    final_estimator: 'LogisticRegression()'
+  distance_metrics:
+    td_algos: 
+    - 'td.Prefix()'
+    - 'td.Postfix()'
+    - 'td.Length()'
+    - 'td.cosine'
+    - 'td.jaccard'
+    - 'td.Bag()'
+    - 'td.Sorensen()'
+    - 'td.MongeElkan()'
+    - 'td.Overlap()'
+    - 'td.Tanimoto()'
+    - 'td.Tversky()'
+    - 'td.levenshtein'
+    - 'td.hamming'
+    - 'td.NeedlemanWunsch()'
+    - 'td.SmithWaterman()'
+    - 'td.Gotoh()'
+    - 'td.StrCmp95()'
+    - 'td.MLIPNS()'
+    - 'td.ArithNCD()'
+    - 'td.BWTRLENCD()'
+    - 'td.RLENCD()'
+    - 'td.ZLIBNCD()'
+    - 'td.SqrtNCD()'
+    - 'td.EntropyNCD()'
+    - 'td.MRA()'
+    - 'td.Editex()'
+    - 'td.LCSSeq()'
+    - 'td.LCSStr()'
+    - 'td.RatcliffObershelp()'
+    - 'td.Jaro()'
+    - 'td.JaroWinkler()'
+    rouge_metrics: 
+    - 'rouge-1'
+    - 'rouge-2'
+    - 'rouge-3'
+    - 'rouge-4'
+    - 'rouge-5'
+    - 'rouge-l'
