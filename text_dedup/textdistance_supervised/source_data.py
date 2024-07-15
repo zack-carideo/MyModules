@@ -8,6 +8,17 @@ import textdistance as td
 from wonderwords import RandomSentence
 s = RandomSentence()
 
+#CUSTOM MODULES
+project_root = os.path.dirname(os.path.abspath(__file__))
+cfg_path = Path(project_root) / 'configs' / 'config.yaml'
+
+sys.path.append(project_root)
+from utils.misc import LoadCFG
+from utils.textdistance_ops import  gen_model_df 
+from utils.text_preprocess import generate_combos,clean_text_cols
+
+
+
 #logger
 logger = logging.getLogger(__name__)
 logging.basicConfig()
@@ -101,15 +112,6 @@ def preprocess_data(df_inpath: str  = None
 
 
 if __name__ == '__main__': 
-
-    #CUSTOM MODULES
-    project_root = os.path.dirname(os.path.abspath(__file__))
-    cfg_path = Path(project_root) / 'configs' / 'config.yaml'
-
-    sys.path.append(project_root)
-    from utils.misc import LoadCFG
-    from utils.textdistance_ops import  gen_model_df 
-    from utils.text_preprocess import generate_combos,clean_text_cols
 
 
     #load config file

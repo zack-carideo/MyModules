@@ -71,7 +71,7 @@ class NumberSelector(BaseEstimator, TransformerMixin):
         return self.key
     
 
-def sk_univariant_vs(X,Y,k=1, max_out=1):
+def sk_univariant_vs(X,Y,k=1, max_out=1, alpha=.05):
     selected_list = []
     selection_methods = {
 
@@ -80,15 +80,15 @@ def sk_univariant_vs(X,Y,k=1, max_out=1):
                                     } for metric in [fs.chi2,fs.f_classif, fs.mutual_info_classif]]
 
         ,'fpr_selection_methods':[{'method':'fpr','metric':metric.__name__
-                                   , 'instance': fs.SelectFpr(score_func=metric, alpha=0.05).fit(X,Y)
+                                   , 'instance': fs.SelectFpr(score_func=metric, alpha=alpha).fit(X,Y)
                                    } for metric in [fs.chi2,fs.f_classif, fs.mutual_info_classif]]
 
         ,'fdr_selection_methods':[{'method':'fdr','metric':metric.__name__
-                                   , 'instance': fs.SelectFdr(score_func=metric, alpha=0.05).fit(X,Y)
+                                   , 'instance': fs.SelectFdr(score_func=metric, alpha=alpha).fit(X,Y)
                                    } for metric in [fs.chi2,fs.f_classif, fs.mutual_info_classif]]
 
         ,'fwe_selection_methods':[{'method':'fwe','metric':metric.__name__
-                                   , 'instance': fs.SelectFwe(score_func=metric, alpha=0.05).fit(X,Y)
+                                   , 'instance': fs.SelectFwe(score_func=metric, alpha=alpha).fit(X,Y)
                                    } for metric in [fs.chi2,fs.f_classif, fs.mutual_info_classif]]
     }
 
@@ -149,7 +149,7 @@ class univariant_sk_vs(_BaseFilter):
         return {'k':self.k, 'min_occurances':self.min_occurances}
     
     def _get_support_mask(self):
-        #check_is_fitted(self)
+        #check_is_fitted(self)  
         return np.array(self.mask)
 
 
@@ -161,6 +161,9 @@ class univariant_sk_vs(_BaseFilter):
 
 
 
+
+
+#IN PROGRESS (if needed)
 class tfidf_document_simularity():
 
     def __init__(self, text_col1: str, text_col2: str):
