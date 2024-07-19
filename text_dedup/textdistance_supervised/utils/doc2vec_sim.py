@@ -77,7 +77,7 @@ class doc2vec_docSim():
 
         if self._index_col:
             self._tagged_corpus = [TaggedDocument(t[0],[t[1]]) for t in zip(self._clean_corpus
-                                                                          ,df[self._index_col])]
+                                                                          ,self._df[self._index_col])]
         else: 
             self._tagged_corpus = [TaggedDocument(d, [i]) for i, d in
                                    enumerate(self._clean_corpus)]
