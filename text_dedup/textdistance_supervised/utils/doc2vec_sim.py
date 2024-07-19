@@ -50,7 +50,7 @@ class doc2vec_docSim():
         self._index_fitted = False
         self._index = None 
 
-
+        #generate init param settings for doc2vec
         self._params = {k:v for k,v in locals().items() if k 
                         not in ['self', 'df','text_col_2_index', 'index_col','text_col_2_index'] and v is not None}
         
@@ -62,7 +62,7 @@ class doc2vec_docSim():
         """
         Preprocesses the text corpus by applying tokenization and other preprocessing steps.
         """
-        
+
         self._clean_corpus = preprocess_documents(self._corpus)
     
 
@@ -156,76 +156,67 @@ class doc2vec_docSim():
 #2. 
 # Create a dataframe with random sentences
 
+if __name__=='__main__':
 
 
-data = {
-    'index1': [i for i in range(0,5)],
-    'index2': [i+1 for i in range(0,5)],
-    'target': [1, 0, 1, 0, 1],
-    'lob1': ['a', 'b', 'c', 'd', 'e'],
-    'lob2': ['a', 'b', 'h', 'i', 'e'],
-    'text1': ['The quick brown fox jumps over the lazy dog', 'Hello world', 'I love programming', 'Python is awesome', 'Data science is interesting'],
-    'text2': ['The quick brown dog jumps on the log.', 'Goodbye world', 'I enjoy coding', 'Python is powerful', 'Machine learning is fascinating']
-}
-#create dataframe 
-df = pd.DataFrame(data)
+    data = {
+        'index1': [i for i in range(0,5)],
+        'index2': [i+1 for i in range(0,5)],
+        'target': [1, 0, 1, 0, 1],
+        'lob1': ['a', 'b', 'c', 'd', 'e'],
+        'lob2': ['a', 'b', 'h', 'i', 'e'],
+        'text1': ['The quick brown fox jumps over the lazy dog', 'Hello world', 'I love programming', 'Python is awesome', 'Data science is interesting'],
+        'text2': ['The quick brown dog jumps on the log.', 'Goodbye world', 'I enjoy coding', 'Python is powerful', 'Machine learning is fascinating']
+    }
+    #create dataframe 
+    df = pd.DataFrame(data)
 
 
-query= 'The quick brown fox jumps over the lazy dog'
+    #use a test query to identify which combination of hyperparms best represents the query
+    query= 'The quick brown fox jumps over the lazy dog'
 
-dm = [1, 0]
-vector_size = [10, 20, 50, 100, 200]
-window = [1, 2, 3, 4]
-dm_mean = [0,1]
-dm_concat = [0,1]
-dbow_words = [0,1]
-hs = [1, 0]
+    #hyperparam grid
+    dm = [1, 0]
+    vector_size = [10, 20, 50, 100, 200]
+    window = [1, 2, 3, 4]
+    dm_mean = [0,1]
+    dm_concat = [0,1]
+    dbow_words = [0,1]
+    hs = [1, 0]
 
-paramsList = [{'dm': item[0]
-               , 'vector_size': item[1]
-               , 'window': item[2]
-               , 'hs': item[3]
-               , 'dm': item[4]
-               , 'dm_mean':item[5]
-               , 'dm_concat': item[6]
-               , 'dbow_words': item[7]
-               } for item in
-                 list(itertools.product(*[dm
-                                          , vector_size
-                                          , window
-                                          , hs
-                                          , dm 
-                                          , dm_mean
-                                          , dm_concat
-                                          , dbow_words
-                                          ]))
-              ]
+    paramsList = [{'dm': item[0]
+                , 'vector_size': item[1]
+                , 'window': item[2]
+                , 'hs': item[3]
+                , 'dm': item[4]
+                , 'dm_mean':item[5]
+                , 'dm_concat': item[6]
+                , 'dbow_words': item[7]
+                } for item in
+                    list(itertools.product(*[dm
+                                            , vector_size
+                                            , window
+                                            , hs
+                                            , dm 
+                                            , dm_mean
+                                            , dm_concat
+                                            , dbow_words
+                                            ]))
+                ]
 
-_params = dict(
-                 index_col='index1'
-                , doc2vec_dm = None
-                , doc2vec_hs = None
-                , dm_mean = None
-                , dm_concat = None
-                , dbow_words = None
-                , vector_size = None
-                , window = None
-                , shrink_window=None 
-                , alpha = None
-                , min_alpha = None
-                , epochs = None)
 
-topn = 5
+    #loop over hyperparms and query index for each set
+    res = []
+    for _parmas in paramsList:
+        d2v_indexer = doc2vec_docSim(df, 'text1',index_col = 'index1',**_parmas
+        )
 
-res = []
-for _parmas in paramsList:
-    d2v_indexer = doc2vec_docSim(df, 'text1',index_col = 'index1',**_parmas
-    )
-
-    res.append(d2v_indexer.search_index(query, topn=2, return_df=True)
-               .assign(**_parmas)
-               
-               )
+        res.append(d2v_indexer.search_index(query, topn=2, return_df=True)
+                .assign(**_parmas)
+                )
+        
+    #Rsults dataframe from all experiments 
+    res_df = pd.concat(res)
 
 
 
@@ -234,87 +225,3 @@ for _parmas in paramsList:
 
 
 
-
-
-
-
-
-data = {
-    'index1': [i for i in range(0,5)],
-    'index2': [i+1 for i in range(0,5)],
-    'target': [1, 0, 1, 0, 1],
-    'lob1': ['a', 'b', 'c', 'd', 'e'],
-    'lob2': ['a', 'b', 'h', 'i', 'e'],
-    'text1': ['The quick brown fox jumps over the lazy dog', 'Hello world', 'I love programming', 'Python is awesome', 'Data science is interesting'],
-    'text2': ['The quick brown dog jumps on the log.', 'Goodbye world', 'I enjoy coding', 'Python is powerful', 'Machine learning is fascinating']
-}
-
-query= 'The quick brown fox jumps over the lazy dog'
-topn = 5
-
-#create dataframe 
-df = pd.DataFrame(data)
-
-
-# Preprocess the documents(word tokenize)
-processed_corpus = preprocess_documents(df['text1'])
-
-#tag corpus with index
-tagged_corpus = [TaggedDocument(d, [i]) for i, d in
-                   enumerate(processed_corpus)]  # preprocess the test dataset
-
-tagged_corpus = [TaggedDocument(t[0],[t[1]]) for t in zip(processed_corpus
-                                                                          ,df['index1'])]
-#create doc2vec model (iterate over hyperparms to get best solution )
-model = Doc2Vec(tagged_corpus,
-                dm=1,
-                vector_size=50, 
-                window=4, 
-                min_count=1, 
-                epochs=10, 
-                hs=1)
-
-#infer vector for new document
-test_doc_vec = model.infer_vector(
-  preprocess_string(query)
-  )
-
-#find similar documents
-sims = model.dv.most_similar(positive=[test_doc_vec])
-tops_sims = sims[:topn]
-
-def evaluation_doc2vec(dataList, params, processed_corpus, top=10):
-  # preprocess corpus
-  tagged_corpus = [TaggedDocument(d, [i]) for i, d in
-                   enumerate(processed_corpus)]  # preprocess the test dataset
-  for movie in dataList:
-    movie['plot_preproc'] = preprocess_string(movie['plot'])
-    movie['regex'] = re.compile(movie['titleRegex'])
-
-  scoreList = []
-  for param in params:
-    param['score'] = 0
-    model = None
-    try:
-      model = Doc2Vec(tagged_corpus,
-                      dm=param['dm'], 
-                      vector_size=param['vector_size'], 
-                      window=param['window'], 
-                      min_count=1, 
-                      epochs=10, 
-                      hs=param['hs'])
-      for movie in dataList:
-        new_doc = movie['plot_preproc']
-        test_doc_vector = model.infer_vector(new_doc)
-        sims=model.docvecs.most_similar(
-          positive=[test_doc_vector])
-        topSims = sims[:10]
-        for i in range(len(topSims)):
-          if movie['regex'].match(df['Title'].iloc[topSims[i][0]]):
-            param['score'] = param['score'] + (top - i)
-      scoreList.append(param)
-    except Exception as error:
-      print(f'Cannot evaluate model with parameters {param}
-              because of error: {error}')
-      continue
-  return scoreList
