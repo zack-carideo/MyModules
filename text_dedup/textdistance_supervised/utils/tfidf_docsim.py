@@ -113,7 +113,7 @@ class tfidf_docSim():
         Generates the TF-IDF model using the bag-of-words corpus.
         """
         assert self._bow_corpus is not None, "Corpus has not been converted to bow"
-        self._tfidf = TfidfModel(corpus=self._bow_corpus, min
+        self._tfidf = TfidfModel(corpus=self._bow_corpus, 
                                  , dictionary=self._dictionary
                                  , smartirs=self._tfidf_param)
  
