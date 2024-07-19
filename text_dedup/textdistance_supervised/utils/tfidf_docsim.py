@@ -113,7 +113,7 @@ class tfidf_docSim():
         Generates the TF-IDF model using the bag-of-words corpus.
         """
         assert self._bow_corpus is not None, "Corpus has not been converted to bow"
-        self._tfidf = TfidfModel(corpus=self._bow_corpus
+        self._tfidf = TfidfModel(corpus=self._bow_corpus, min
                                  , dictionary=self._dictionary
                                  , smartirs=self._tfidf_param)
  
@@ -184,30 +184,52 @@ class tfidf_docSim():
             return [{**{k: v for k, v in t[0].items()}, **{k: v for k, v in t[1].items()}} for t in output]
 
 
-# Create a dataframe with random sentences
-data_size = 4
-data = {
-    'index1': [i for i in range(0,data_size*5)],#data_size*[1, 2, 3, 4, 5],
-    'index2': [i+1 for i in range(0,data_size*5)],
-    'target': data_size*[1, 0, 1, 0, 1],
-    'lob1': data_size*['a', 'b', 'c', 'd', 'e'],
-    'lob2': data_size*['a', 'b', 'h', 'i', 'e'],
-    'text1': data_size*[f"{s.sentence()}.{s.sentence()}",s.sentence(),s.sentence(), s.sentence(),s.sentence()],#['The quick brown fox jumps over the lazy dog', 'Hello world', 'I love programming', 'Python is awesome', 'Data science is interesting'],
-    'text2': data_size*[f"{s.sentence()}.{s.sentence()}",s.sentence(),s.sentence(), s.sentence(),s.sentence()]#['The quick brown dog jumps on the log.', 'Goodbye world', 'I enjoy coding', 'Python is powerful', 'Machine learning is fascinating']
-}
+if __name__ == '__main__':
 
-#create dataframe 
-df = pd.DataFrame(data)
+    # Create a dataframe with random sentences
+    data_size = 4
+    data = {
+        'index1': [i for i in range(0,data_size*5)],#data_size*[1, 2, 3, 4, 5],
+        'index2': [i+1 for i in range(0,data_size*5)],
+        'target': data_size*[1, 0, 1, 0, 1],
+        'lob1': data_size*['a', 'b', 'c', 'd', 'e'],
+        'lob2': data_size*['a', 'b', 'h', 'i', 'e'],
+        'text1': data_size*[f"{s.sentence()}.{s.sentence()}",s.sentence(),s.sentence(), s.sentence(),s.sentence()],#['The quick brown fox jumps over the lazy dog', 'Hello world', 'I love programming', 'Python is awesome', 'Data science is interesting'],
+        'text2': data_size*[f"{s.sentence()}.{s.sentence()}",s.sentence(),s.sentence(), s.sentence(),s.sentence()]#['The quick brown dog jumps on the log.', 'Goodbye world', 'I enjoy coding', 'Python is powerful', 'Machine learning is fascinating']
+    }
 
-#generate index 
-tfidf_indexer = tfidf_docSim(
-                   df
-                 , 'text1'
-                 , tfidf_param = 'Lpb'
-                 )
-
-#search the index 
-tfidf_indexer.search_index('The easy bikini rains meatball.	'
-                           , topn=5,return_df=True)
+    #create dataframe 
+    df = pd.DataFrame(data)
 
 
+    #set up param grid for hyperparm tuning 
+    termfreq = ['b', 'n', 'a', 'l', 'd', 'L']
+    docfreq = ['n', 'f', 'p']
+    docnorm = ['n', 'c', 'u', 'b']
+    param_grid = [''.join(comb) for comb in
+               list(itertools.product(*[termfreq,
+                                        docfreq,
+                                        docnorm]))
+                ]
+
+    #holds results of hp eval
+    res = []
+
+    for _params in param_grid: 
+        
+        try: 
+            #generate index 
+            tfidf_indexer = tfidf_docSim(
+                            df
+                            , 'text1'
+                            , tfidf_param = _params
+                            )
+
+            #search the index 
+            res.append(tfidf_indexer.search_index('The easy bikini rains meatball.	'
+                                    , topn=5,return_df=True).assign(param=_params))
+
+        except:
+            print(f"param setup: {_params} failed") 
+    res_df = pd.concat(res)
+    print(res_df.head(10))
