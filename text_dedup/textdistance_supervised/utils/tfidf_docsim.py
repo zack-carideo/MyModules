@@ -319,7 +319,11 @@ if __name__ == '__main__':
         else: 
             #load model 
 
+
+            #initiate class 
             _indexer = tfidf_docSim()
+            
+            #load model and model inputs ./ IR dependencies 
             _indexer = _indexer.load_model(Path(model_output_dir).as_posix())
 
             #search the index
