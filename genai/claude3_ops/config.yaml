@@ -1,5 +1,15 @@
-api_key: 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
+api_key: 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
 model:  "claude-3-opus-20240229"
 max_tokens:  4000
 temperature:  0 
-
+top_p:  1.0
+out_dir: /home/zjc1002/Mounts/data/claude_outputs
+pdf_input_files:
+  - "/home/zjc1002/Downloads/pub-semiannual-risk-perspective-spring-2024.pdf"
+  - "/home/zjc1002/Downloads/nr-occ-2023-109a.pdf"
+  - "/home/zjc1002/Downloads/financial-stability-report-20240419.pdf"
+  - "/home/zjc1002/Downloads/202405-supervision-and-regulation-report.pdf"
+  - "/home/zjc1002/Downloads/cfpb_supervisory-highlights_issue-33_2024-04.pdf"
+  - "/home/zjc1002/Downloads/2024-annual-regulatory-oversight-report.pdf"
+  - "/home/zjc1002/Downloads/ssm.supervisory_priorities202312~a15d5d36ab.en.pdf"
+  - "/home/zjc1002/Downloads/nc-state-protiviti-survey-top-risks_2024-2034.pdf"
