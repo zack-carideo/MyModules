@@ -5,85 +5,81 @@ import yaml
 
 _root = Path.cwd()
 sys.path.append(_root.as_posix())
-from prompt_utils import get_completion, create_anthropic_prompt
+from prompt_utils import get_completion
 
 
+def risk_and_controls_prompt(REPORT_TEXT):
+    _prompt = f"""You are an AI researcher tasked with analyzing financial market publications to identify risks that have the potential to negatively impact the financial industry. Your specific task is to identify the latest emerging risks to Internal Audit teams in the financial industry for the year 2024 and create corresponding controls to mitigate these risks. Follow these instructions carefully to complete the task.
 
+    First, review the following report carefully:
 
-def risk_and_controls_prompt(report_text: str):
-
-
-    hl_objective = f"""
-    Your task is to analyze financial industry reports, identify risks from the report, and create FRASA compliant controls to mitigate each risk.
-    First you will be provided a report to analyze. Review this information carefully. :  
-    
     <report>
-    [{report_text}]
+    {{REPORT_TEXT}}
     </report>
 
-    Now, Follow the below instructions carefully to complete the task step by step."""
+    Now, proceed with the following steps:
 
-    task_1 = f"""
     <Step1>
-    Create a bulleted overview of risks from the <report> that have the potential to negativly impact the financial sector, specifically Globally Systemic Important Banks(G-SIB).
-    Each risk should be distinct and capture a unique emerging threat to financial institutions.
-    Use the information from the <report> to identify the risks, and provide a description of the risk and how it could impact a G-SIB.
-    If you cannot provide a consise description of the risk using the <report>, you can use your knowlodge of the banking industry to enrich the risk descriptions.
-    The goal of this overview is to ensure Internal Audit Teams stays up to date on the newest risks that are expected to impact the financial institution in in the coming quarters(June 2024-June 2025)
-    
-    Output your results in the following format:
+    1. Analyze the report to identify emerging risks that are expected to impact financial institutions in 2024. Focus on factors such as recency, potential impact, and specificity to the financial sector.
+
+    2. For each risk you identify:
+    a. Provide a concise name for the risk
+    b. Write a brief description of the risk, explaining how it could affect financial institutions
+
+    3. Ensure that each risk you identify is distinct and captures a unique emerging threat to financial institutions.
+
+    4. Prioritize risks that are particularly relevant to Internal Audit teams in the financial industry.
+
+    5. Aim to identify at least 3-5 significant emerging risks, but do not exceed 10 risks.
+
+    6. Present your findings in the following format:
 
     <risks>
-        - [Risk Name] ::: [Risk Description]
-        - [Risk Name] ::: [Risk Description]
-        ....
-        [Continue for all risks identified]
+    - [Risk Name] ::: [Risk Description]
+    - [Risk Name] ::: [Risk Description]
+    (continue for each identified risk)
     </risks>
-    </Step1>\n
-    """
 
+    Remember to focus on emerging risks specifically for the year 2024 and ensure that each risk is distinct and relevant to the financial sector. Your goal is to provide valuable insights that will help Internal Audit teams stay up-to-date on the newest potential threats to their institutions.
+    </Step1>
 
-    task_2 = f"""
     <Step2>
-    For each risk identified in <Step 1>, your task is to create 5 controls to mitigate the risk. 
-    Each control must adhere to the below <FRASA CONTROL REQUIRMENTS> and should mitigate a unique aspect of the risk
-    
+    For each risk identified in Step 1, your task is to create 5 controls to mitigate the risk. Each control should mitigate a unique aspect of the risk and must include details to satisfy all 5 components of the below FRASA Control Requirements.
+
     Here are the FRASA Control Requirements:
-        <FRASA CONTROL REQURIMENTS>
-            1. Frequency: The frequency or timing of occurrence, how often will the control be evaluated
-            2. Responsible Party: The party responsible for conducting the risk-mitigating activity (e.g., the director of trading reviews..., the accounting associate compares...)
-            3. Activity: The specific risk-mitigating activity to be performed as part of the control (e.g., reconciliations are performed and reviewed between bank account balance and general ledger cash account balance and adjustments are recorded if needed)
-            4. Source: The sources of information (if applicable) — The control should either define how management has addressed the completeness and accuracy of the information used in the control or there should be separate controls that address the completeness and accuracy of the information
-            5. Action Taken: The action taken with the results of the control activity (for example, adjustments are made to the general ledger cash accounts, if needed, based on reconciliation to the bank balances)
-        </FRASA CONTROL REQURIMENTS>
+    <FRASA_CONTROL_REQUIREMENTS>
+    1. Frequency: The frequency or timing of occurrence, how often will the control be evaluated
+    2. Responsible Party: The party responsible for conducting the risk-mitigating activity (e.g., the director of trading reviews..., the accounting associate compares...)
+    3. Activity: The specific risk-mitigating activity to be performed as part of the control (e.g., reconciliations are performed and reviewed between bank account balance and general ledger cash account balance and adjustments are recorded if needed)
+    4. Source: The sources of information — The control should either define how management has addressed the completeness and accuracy of the information used in the control or there should be separate controls that address the completeness and accuracy of the information
+    5. Action Taken: The action taken with the results of the control activity (for example, adjustments are made to the general ledger cash accounts, if needed, based on reconciliation to the bank balances)
+    </FRASA_CONTROL_REQUIREMENTS>
 
-    Use the <risks> from <Step1> and the information from the <report_text> and all other knowlodge available to you to create risk specific controls. 
-    Ensure that each control description is comprehensive and addresses all five FRASA Control Requirements.
-    
+    Use the risks from Step 1, the information from the report text, and all other knowledge available to you to create risk-specific controls. Ensure that each control description is comprehensive and addresses all five FRASA Control Requirements.
+
     Present your results in the following format:
-        <Risk Controls>
-            - [Risk 1 Name] : [Control 1 Name] : [Detailed FRASA-compliant control description]
-            - [Risk 1 Name] : [Control 2 Name] : [Detailed FRASA-compliant control description]
-            .....
-            - [Risk 1 Name] : [Control 5 Name] : [Detailed FRASA-compliant control description]
-            - [Risk 2 Name] : [Control 1 Name] : [Detailed FRASA-compliant control description]
-            - [Risk 2 Name] : [Control 2 Name] : [Detailed FRASA-compliant control description]
-            .....
-            - [Risk 2 Name] : [Control 5 Name] : [Detailed FRASA-compliant control description]
-            ....
-            [Continue for all risks and controls]
-        </Risk Controls>
-    </Step2>"""
+    <Risk_Controls>
+    - [Risk 1 Name] ::: [Control 1 Name] ::: [Detailed FRASA-compliant control description]
+    - [Risk 1 Name] ::: [Control 2 Name] ::: [Detailed FRASA-compliant control description]
+    .....
+    - [Risk 1 Name] ::: [Control 5 Name] ::: [Detailed FRASA-compliant control description]
+    - [Risk 2 Name] ::: [Control 1 Name] ::: [Detailed FRASA-compliant control description]
+    - [Risk 2 Name] ::: [Control 2 Name] ::: [Detailed FRASA-compliant control description]
+    .....
+    - [Risk 2 Name] ::: [Control 5 Name] : [Detailed FRASA-compliant control description]
+    ....
+    [Continue for all risks and controls]
+    </Risk_Controls>
+    </Step2>
 
-    closing_text = f"""
-    Ensure that your analysis is thorough, clear, and actionable for Internal Audit teams within financial institutions. 
+    After completing both steps, review your work to ensure all risks and controls are relevant, distinct, and properly formatted. Your final output should provide a comprehensive analysis of emerging risks for 2024 and detailed, FRASA-compliant controls to mitigate these risks, tailored specifically for Internal Audit teams in the financial industry.
     Use all available tokens to create detailed and specific controls for each risk.
     """
 
-    _prompt = f"{hl_objective}\n{task_1}\n{task_2}\n{closing_text}"
+    return _prompt 
 
-    return _prompt
 
+    
 def generate_risk_controls_prompt(client
                 , model_name:str 
                 , report_text: str
@@ -109,7 +105,7 @@ def generate_risk_controls_prompt(client
 
 
 if __name__ == "__main__":
-    
+
     df_path = "/home/zjc1002/Mounts/data/claude_outputs/final_data.pq"
     df = pd.read_parquet(df_path)
 

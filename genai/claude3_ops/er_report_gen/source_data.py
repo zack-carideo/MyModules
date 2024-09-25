@@ -43,7 +43,7 @@ summary_system_p = cfg['llms']['anthropic']['summarization']['system_p']
 summary_min_text_length = cfg['llms']['anthropic']['summarization']['min_text_length_2_summarize']
 summary_chunk_size = cfg['llms']['anthropic']['summarization']['ntoken_chunk_size']
 summary_model = cfg['llms']['anthropic']['summarization']['model_name']
-
+summary_chunk_and_summarize = cfg['llms']['anthropic']['summarization']['chunk_and_summarize']
 
 #in house llm settings 
 chunk_docs = cfg['data']['input']['chunk_docs']
@@ -81,23 +81,30 @@ pdf_data['final_text'] = pdf_data['pdf_text'].copy()
 #loop over pdfs before passing to cluade to extract risks to summarize if needed 
 for _idx, _pdf_row in pdf_data.iterrows(): 
 
-    #if pdf has more than 40 pages, generate a summary prompt
+    #if pdf has more than 40 pages, generate a summary prompt or take the begining and end of the report
     if len(_pdf_row['pdf_text'])>summary_min_text_length: 
+        
+        #if you want to generate summaries of chunks and concatenate them
+        if summary_chunk_and_summarize: 
+            logger.info(f"Summarizing pdf {_pdf_row['pdf_path']}")
 
-        logger.info(f"Summarizing pdf {_pdf_row['pdf_path']}")
+            _summary  = chunk_summarize_combine( 
+                        client
+                    , summary_model
+                    , _pdf_row['pdf_text']
+                    , chunk_size_tokens = summary_chunk_size
+                    , max_tokens = 4096
+                    , temperature = temperature
+                    , system = summary_system_p
+                    )
 
-        _summary  = chunk_summarize_combine( 
-                    client
-                , summary_model
-                , _pdf_row['pdf_text']
-                , chunk_size_tokens = summary_chunk_size
-                , max_tokens = 4096
-                , temperature = temperature
-                , system = summary_system_p
-                )
-
-        pdf_data.loc[_idx,'final_text'] = _summary 
+            pdf_data.loc[_idx,'final_text'] = _summary 
     
+        else: 
+            #extract information from begining and end of report up to the max seq length considered for summarizaztion 
+            start_and_end_text_len = int(round(summary_min_text_length/2,0))
+            pdf_data.loc[_idx,'final_text'] = _pdf_row['pdf_text'][:start_and_end_text_len] + _pdf_row['pdf_text'][-start_and_end_text_len:]
+
     else: 
         pdf_data.loc[_idx,'final_text'] = _pdf_row['pdf_text']
     

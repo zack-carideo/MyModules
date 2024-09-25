@@ -5,7 +5,7 @@ import yaml
 
 _root = Path.cwd()
 sys.path.append(_root.as_posix())
-from prompt_utils import get_completion, create_anthropic_prompt,extract_text_between_anchors
+from prompt_utils import get_completion
 
 
 
@@ -15,52 +15,47 @@ def control_testing_prompt(REGULATORY_RISK_CONTROLS
                    , RAW_REPORTS
                    ):
     _prompt = f"""
-        You are a financial industry regulator tasked with generating control testing procedures. Specificaly you will be asked to create step by step testing procedures to evaluate the impact of financial and regulatory controls on a bank. 
-        You will analyze the following financial risk report. Use the information from the Risk Controls(delimited as <Risk Controls></Risk Controls>) section of the report to define the controls in scope of control testing.:
+    You are an AI assistant tasked with generating control testing procedures for a large financial institution. Your goal is to evaluate the impact of financial and regulatory controls on a bank. Follow these instructions carefully to complete the task:
 
-        <financial_risk_reports>
-        [{REGULATORY_RISK_CONTROLS}]
-        </financial_risk_reports>
+    First, analyze the following financial risk report. The Risk Controls section contains information about the controls in scope for testing:
 
-        you can also reference information from these raw_financial_reports to help inform your control testing procedures. 
-        <raw_financial_reports>
-        [{RAW_REPORTS}]
-        </raw_financial_reports>
+    <financial_risk_reports>
+    {REGULATORY_RISK_CONTROLS}
+    </financial_risk_reports>
 
+    You can also reference information from these raw financial reports to help inform your control testing procedures:
 
-        Follow these instructions carefully to complete the task:
+    <raw_financial_reports>
+    {RAW_REPORTS}
+    </raw_financial_reports>
 
-        <Step1>
-        Identify Most Relevant Controls: 
-        a. For each Risk Theme in the  <Risk Controls> section of <financial_risk_reports>, select the 2 controls that are most likely to mitigate the risk.For Reference , Each bullet in the <Risk Controls> section of the <financial_risk_reports> is formatted as follows:
-            - [Risk Theme]: [Control Name] : [Control Description] 
-        
-        b. Do not  output the results from this step. the information will be used in the next step.
+    Now, proceed with the following steps:
 
-        </Step1>
-        
-        <Step2> 
-        Control Testing: 
+    1. Analyze the Risk Controls section of the financial risk reports. For each Risk, select the 3 controls that are most likely to mitigate the risk. Note that each bullet in the Risk Controls section is formatted as follows:
+    - [Risk Name] ::: [Control Name] ::: [Control Description]
 
-        a. For each Control selected in <Step1> create a step by step control testing procedure to evalute how effectivly each control mitigates the risk. 
-            Each Control Testing Procedure should contain an ordered list of steps that can be used to evaluate the control(ex. [Step 1: <description of step>, Step 2: <description of step>,..., Step n: <description of step> ]). 
-            Control Testing Procedures should be measurable, diverse, and incorporate control specific information from the [Control Description].
-            Use the control information from <Step1> and the information from the <raw_financial_reports> to generating control testing procedures. 
-            You can also use your own knowlodge of financial control testing. Control testing procedures must be consise enough to fit testing procedures for all selected control from <Step1> within the maximum token limit.
+    2. For each Control selected in step 1, create a step-by-step control testing procedure to evaluate how effectively each control mitigates the risk. Use the control information, the information from the raw financial reports, and your domain knowledge to generate these procedures.
 
-        b. Output your results in the following format:
-            <control_test_procedures>
-             - [Risk Theme] : [Control Name] : [Control Description] : [Control Testing Procedure]
-            ....
+    3. Ensure that each Control Testing Procedure contains an ordered list of steps that can be used to evaluate and quantify the control effectiveness (e.g., [Step 1: <description of step>, Step 2: <description of step>,..., Step n: <description of step>]). 
 
-            [Continue for all selected controls]
-            ...
-            </control_test_procedures>
-        </Step2>    
+    4. Make sure the Control Testing Procedures are measurable, diverse, and incorporate control-specific information from the [Control Description].
 
-        Ensure that your output follows the specified formats and includes all required information for each step. 
-        Your response must contain valid control testing procedures for all selected controls. Use the maximum number of avilable tokens to provide through and concise results.                 
-        """
+    5. Output your results in the following format:
+
+    <control_test_procedures>
+    - [Risk Name] ::: [Control Name] ::: [Control Description] ::: [Control Testing Procedure]
+    [Continue for all selected controls]
+    </control_test_procedures>
+
+    Additional guidelines:
+    - Ensure that your output follows the specified format and includes all required information for each step.
+    - Your response must contain valid control testing procedures for all selected controls.
+    - Control testing procedures must be concise enough to fit testing procedures for all selected controls within the maximum token limit.
+    - Use the maximum number of available tokens to provide thorough and concise results.
+    - Do not include any explanations or comments outside of the specified output format.
+
+    Begin your analysis and procedure generation now.
+    """
     return _prompt
 
 

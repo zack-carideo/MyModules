@@ -18,91 +18,97 @@ logger =  logging.getLogger(__name__)
 def controls_from_risks(RISKS):
 
     _prompt = f"""
-    You are an internal auditor working for a large financial institution. 
-    Your task is to create controls to mitigate a set of risks identified by financial leaders. 
-    The controls must be objective and measurable. All controls must satisfy the FRASA Control Requirements.Controls should be written in complete sentences. 
-        
-    Here are the FRASA Control Requirements:
-    1. Frequency: The frequency or timing of occurrence, how often will the control be evaluated
-    2. Responsible Party: The party responsible for conducting the risk-mitigating activity (e.g., the director of trading reviews..., the accounting associate compares...)
-    3. Activity: The specific risk-mitigating activity to be performed as part of the control (e.g., reconciliations are performed and reviewed between bank account balance and general ledger cash account balance and adjustments are recorded if needed)
-    4. Source: The sources of information (if applicable) — The control should either define how management has addressed the completeness and accuracy of the information used in the control or there should be separate controls that address the completeness and accuracy of the information\n5. Action Taken: The action taken with the results of the control activity (for example, adjustments are made to the general ledger cash accounts, if needed, based on reconciliation to the bank balances)
+    You are an AI internal auditor tasked with identifying risks to the financial industry and creating controls to mitigate these risks. Your specific task is to analyze a set of risks identified by financial regulators and create objective, measurable controls to mitigate them. Follow these instructions carefully to complete the task:
 
-    You will be provided with a list of risks in the financial industry. Your task is to generate 5 controls for each risk that comply with the FRASA Control Requirements.
-    Here is the list of risks:
+    First, review the following list of risks:
+
     <risks>
     {RISKS}
     </risks>
-    
-    Follow the below steps to complete the task, think step by step :
 
-    <Step1>
+    Next, familiarize yourself with the FRASA Control Requirements. Each control you generate must satisfy all of these requirements:
 
-        1. For each risk in the list, generate 5 controls that can be used to mitigate the risk.
-        2. Ensure that each control complies with all five FRASA Control Requirements.
-        3. Consider factors such as recency, authority of the source, and specificity to the financial sector when creating controls.
-        4. Use all information available to you to generate these controls.
-        5. Present your results in the following format:
-    
-            <Risk Controls>
-                - [Risk 1 Name] : [Control 1 Name] : [Detailed FRASA-compliant control description]
-                - [Risk 1 Name] : [Control 2 Name] : [Detailed FRASA-compliant control description]
-                .....
-                - [Risk 1 Name] : [Control 5 Name] : [Detailed FRASA-compliant control description]
-                - [Risk 2 Name] : [Control 1 Name] : [Detailed FRASA-compliant control description]
-                - [Risk 2 Name] : [Control 2 Name] : [Detailed FRASA-compliant control description]
-                .....
-                - [Risk 2 Name] : [Control 5 Name] : [Detailed FRASA-compliant control description]
-                ....
-                [Continue for all risks and controls]
-            </Risk Controls>
+    <FRASA_Control_Requirements>
+    1. Frequency: The frequency or timing of occurrence, how often will the control be evaluated
+    2. Responsible Party: The party responsible for conducting the risk-mitigating activity
+    3. Activity: The specific risk-mitigating activity to be performed as part of the control
+    4. Source: The sources of information used in the control
+    5. Action Taken: The action taken with the results of the control activity
+    </FRASA_Control_Requirements>
 
-    </Step 1>
+    Now, proceed with the following steps:
 
-    Ensure that each control description is comprehensive and addresses all five FRASA Control Requirements. Use all available tokens to create detailed and specific controls for each risk."""
-                
+    1. For each risk in the <risks> list, identify 5 unique emerging sub-risks that capture different components of the main risk. Use the most current information available to you to ensure these sub-risks are relevant for 2024.
+
+    2. For each sub-risk, generate a control to mitigate it. Ensure that each control:
+    a. Is objective and measurable
+    b. Complies with all five FRASA Control Requirements
+    c. Is unique and distinct from the other controls generated for the same risk
+
+    3. Present your results in the following format:
+
+    <risk_controls>
+    - [Risk 1 Name] ::: [Control 1 Name] ::: [Detailed FRASA-compliant control description]
+    - [Risk 1 Name] ::: [Control 2 Name] ::: [Detailed FRASA-compliant control description]
+    ...
+    - [Risk 1 Name] ::: [Control 5 Name] ::: [Detailed FRASA-compliant control description]
+    - [Risk 2 Name] ::: [Control 1 Name] ::: [Detailed FRASA-compliant control description]
+    - [Risk 2 Name] ::: [Control 2 Name] ::: [Detailed FRASA-compliant control description]
+    ...
+    - [Risk 2 Name] ::: [Control 5 Name] ::: [Detailed FRASA-compliant control description]
+    ...
+    [Continue for all risks and controls]
+    </risk_controls>
+
+    Ensure that each control description is comprehensive and addresses all five FRASA Control Requirements. Use all available tokens to create detailed and specific controls for each risk.
+
+    After completing these steps, review your work to ensure all risks and controls are relevant, distinct, and properly formatted. Verify that all controls satisfy the FRASA Control Requirements.
+
+    Your final output should provide a comprehensive analysis of emerging risks for 2024 and detailed, FRASA-compliant controls to mitigate these risks, tailored specifically for Internal Audit teams in the financial industry.
+    """
+
     return _prompt
 
 #You will use the FRASA compliant control descriptions to inform each control testing procedure. the risks and controls provided will be formatted as follows:
         
 def control_testing_procedures_from_controls(controls):
     _prompt = f"""
-        You are a financial industry regulator tasked with generating control testing procedures given a set of risks and associated FRASA compliant Controls. 
-        Specificaly you will be given a financial risk report with risks and associated FRASA compliant controls. 
-        You will create step by step testing procedures for each control to evaluate the financial and regulatory impact of the control on a bank. 
-        Use the information from the Risk Controls(delimited as <Risk Controls></Risk Controls>) section of the financial risk report to define the controls in scope of control testing.
-        For refernce , the <Risk Controls> Section of the financial risk report is formatted as follows: - [Risk Name] : [Control Name] : [FRASA-compliant control description]
+    You are an AI internal auditor tasked with generating control testing procedures for a large financial institution. 
+    Your goal is to evaluate the impact of financial and regulatory controls on a bank to help them mitigate risk. 
+    Follow these instructions carefully to complete the task:
 
-        The financial risk report with the controls requiring contorl testing procedures is below:
-        <financial_risk_report>
-        [{controls}]
-        </financial_risk_report>
+    First, analyze the following summary of controls. The Risk Controls section of the risk summary contains information about the controls in scope for testing:
 
+    <report_summary>
+    {controls}
+    </report_summary>
 
-        Follow these instructions carefully to complete the task:
+    Now, proceed with the following steps:
 
-        <Step1> 
-        Control Testing Procedures: 
+    1. Analyze the Risk Controls section of the report summary. Note that each bullet in the Risk Controls section is formatted as follows:
+    - [Risk Name] ::: [Control Name] ::: [Control Description]
 
-        a. For each Control from the <financial_risk_report> create a step by step control testing procedure to evalute how effectivly each control mitigates the risk. 
-            Each Control Testing Procedure should contain an ordered list of steps that can be used to evaluate the control(ex. [Step 1: <description of step>, Step 2: <description of step>,..., Step n: <description of step> ]). 
-            Control Testing Procedures should be measurable, diverse, and incorporate control specific information from the [FRASA-compliant control description].
-            You can also use your own knowlodge of financial control testing to generate the control testing procedures. 
-            Control testing procedures must be consise enough to fit testing procedures for all controls in the <financial_risk_report> within the maximum token limit.
+    2. For each Control in step 1, create a step-by-step control testing procedure to evaluate how effectively each control mitigates the risk. Use the control information and your domain knowledge to generate these procedures.
 
-        b. Output your results in the following format.(NOTE: The [Risk Name], [Control Name], and [FRASA-compliant control Description] should come directly from the <financial_risk_report>):
+    3. Ensure that each Control Testing Procedure contains an ordered list of steps that can be used to evaluate and quantify the control effectiveness (e.g., [Step 1: <description of step>, Step 2: <description of step>,..., Step n: <description of step>]). 
 
-            <control_test_procedures>
-             - [Risk Name] : [Control Name] : [FRASA-compliant control Description] : [Control Testing Procedure]
-            ....
+    4. Make sure the Control Testing Procedures are measurable, diverse, and incorporate control-specific information from the [Control Description].
 
-            [Continue for all selected controls]
-            ...
-            </control_test_procedures>
-        </Step1>    
+    5. Output your results in the following format:
 
-        Ensure that your output follows the specified formats and includes all required information for each step. 
-        Your response must contain valid control testing procedures for all selected controls. Use the maximum number of avilable tokens to provide through and concise results.                 
+    <control_test_procedures>
+    - [Risk Name] ::: [Control Name] ::: [Control Testing Procedure]
+    [Continue for all controls in the risk summary]
+    </control_test_procedures>
+
+    Additional guidelines:
+    - Ensure that your output follows the specified format and includes all required information for each step.
+    - Your response should contain valid control testing procedures for all controls listed in the risk summary.
+    - Control testing procedures must be concise enough to fit testing procedures for all controls within the maximum token limit.
+    - Use the maximum number of available tokens to provide thorough and concise results.
+    - Do not include any explanations or comments outside of the specified output format.
+
+    Begin your analysis and procedure generation now.
         """
     return _prompt
 
@@ -130,7 +136,7 @@ def cot_controls_and_testing_procs(client
                     , system = system 
                     , _type='text')
 
-    logger.info(f"controls for {_risk}")
+    logger.info(f"controls for {risks}")
     logger.info(print(_controls))
 
     #generate task specific prompt
@@ -178,6 +184,7 @@ if __name__ == "__main__":
     #risk and controls 
     risks = cfg['analysis']['risk_themes']
 
+    #loop over each risk, generate controls, and then testing procedures (COT)
     output_ctps = []
     for idx,_risk in enumerate(risks): 
         
@@ -190,7 +197,6 @@ if __name__ == "__main__":
 
         output_ctps.append({'risk':_risk,'control_test_procedures':_response})
 
-    
-
-    df.to_parquet(f"{output_dir}/step2_control_testing_procedures.pq")
+    #save it out 
+    pd.DataFrame(output_ctps).to_parquet(f"{output_dir}/matt_risks_controls_and_testing_procedures_9_24_24.pq")
 

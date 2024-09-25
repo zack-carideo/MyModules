@@ -13,3 +13,4 @@ Each script plays a crucial role in the overall workflow, ensuring that data is 
 1. source_data.py
 2. id_risks_from_report.py
 3. gen_control_test_procs.py
+4. controls_from_risks.py
