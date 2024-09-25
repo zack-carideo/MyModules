@@ -1,0 +1,62 @@
+device: 'cuda'
+
+llms: 
+  dir: "/home/zjc1002/Mounts/llms/"
+  semantic_chunking_model_name: "sentence-transformers/all-MiniLM-L6-v2"
+
+  anthropic: 
+    model_name:  "claude-3-opus-20240229"
+    max_tokens:  4096
+    temperature:  .1
+    top_p:  1.0
+    system_p: "you are an Internal Audit Executive responsible for identifying risks relevent to financial institutions. You are skilled in developing controls to address these risks and working with financial institutions to ensure compliance with regulations." 
+    summarization: 
+      chunk_and_summarize: False
+      model_name: "claude-3-haiku-20240307"
+      min_text_length_2_summarize: 150000
+      ntoken_chunk_size: 20000 
+      system_p: "You are a financial regulator specializing in financial markets and financial regulation, known for highly accurate and detailed summaries of financial industry reports"       
+data: 
+  input: 
+    chunk_docs: False  
+    pdf_files:
+      - "/home/zjc1002/Downloads/pub-semiannual-risk-perspective-spring-2024.pdf"
+      - "/home/zjc1002/Downloads/nr-occ-2023-109a.pdf"
+      - "/home/zjc1002/Downloads/financial-stability-report-20240419.pdf"
+      - "/home/zjc1002/Downloads/202405-supervision-and-regulation-report.pdf"
+      - "/home/zjc1002/Downloads/cfpb_supervisory-highlights_issue-33_2024-04.pdf"
+      - "/home/zjc1002/Downloads/2024-annual-regulatory-oversight-report.pdf"
+      - "/home/zjc1002/Downloads/ssm.supervisory_priorities202312~a15d5d36ab.en.pdf"
+      - "/home/zjc1002/Downloads/nc-state-protiviti-survey-top-risks_2024-2034.pdf"
+    rss_feeds:
+      - https://www.federalreserve.gov/feeds/working_papers.xml
+      - https://www.federalreserve.gov/feeds/press_bcreg.xml
+      - https://www.federalreserve.gov/feeds/press_enforcement.xml
+      - https://www.federalreserve.gov/feeds/press_monetary.xml
+      - https://oig.federalreserve.gov/feeds/oig.xml
+      - https://www.occ.gov/rss/occ_alerts.xml
+      - https://www.occ.gov/rss/occ_bulletins.xml
+      - https://www.occ.gov/rss/occ_news.xml
+      - https://www.occ.gov/rss/occ-community-affairs.xml
+      - http://feeds.finra.org/FINRANotices
+      - http://feeds.finra.org/FINRARuleFilings
+      - http://feeds.finra.org/DisputeResolutionRuleFilings
+      - http://feeds.finra.org/FINRANews
+      - http://feeds.finra.org/FINRACompliancePodcast
+      - https://www.sec.gov/rss/rules/proposed.xml
+  output:
+    dir: /home/zjc1002/Mounts/data/claude_outputs
+    rss_outname: rss_data.pq 
+    pdf_outname: pdf_data.pq
+    risk_controls_outname: risk_controls.pq
+
+analysis: 
+  
+  risk_themes:
+    - "Artifical Intelligence Fraud"
+    - "GeoPolitical Risk"
+    - "Basel III Readiness" 
+    - "Cyber Security Risk"
+    - "Third Party Risk"
+    - "MacroEconomic Risk" 
+    - "Climate Change Risk"
