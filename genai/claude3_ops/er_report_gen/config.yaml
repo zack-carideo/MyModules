@@ -5,7 +5,7 @@ llms:
   semantic_chunking_model_name: "sentence-transformers/all-MiniLM-L6-v2"
 
   anthropic: 
-    api_key: 
+    
     model_name:  "claude-3-opus-20240229"
     max_tokens:  4096
     temperature:  .1
