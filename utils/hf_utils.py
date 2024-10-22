@@ -50,3 +50,36 @@ def download_model_hfhub(repo_id
         print(f"local_dir:{local_dir} already exists, skipping download")
 
 
+
+def download_full_model_directory(repo_id, local_dir):
+    """
+    Download the full model directory from HuggingFace hub and save to local directory
+
+    Args:
+        repo_id (str): repo_id of the model
+        local_dir (str): local_dir to save the model
+    Returns:
+        local_dir (str): local_dir where the model is saved
+    Ex: 
+        repo_id = "sentence-transformers/msmarco-MiniLM-L-6-v3"
+        local_dir = "/home/zjc1002/Mounts/llms/msmarco-MiniLM-L-6-v3"
+
+        download_full_model_directory(repo_id, local_dir)
+    """
+    
+    # Check if local_dir exists
+    if not os.path.exists(local_dir):
+        os.makedirs(local_dir)
+
+    # Download the full model directory
+    snapshot_download(repo_id=repo_id, local_dir=local_dir)
+    return local_dir
+
+if __name__ == '__main__':
+    # Example usage
+    repo_id = "sentence-transformers/msmarco-MiniLM-L-6-v3"
+    local_dir = "/home/zjc1002/Mounts/llms/msmarco-MiniLM-L-6-v3"
+    download_full_model_directory(repo_id, local_dir)
+
+
+    

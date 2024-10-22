@@ -9,7 +9,9 @@ from prompt_utils import get_completion
 
 
 def risk_and_controls_prompt(REPORT_TEXT):
-    _prompt = f"""You are an AI researcher tasked with analyzing financial market publications to identify risks that have the potential to negatively impact the financial industry. Your specific task is to identify the latest emerging risks to Internal Audit teams in the financial industry for the year 2024 and create corresponding controls to mitigate these risks. Follow these instructions carefully to complete the task.
+    _prompt = f"""You are an AI researcher tasked with analyzing financial market publications to identify risks that have the potential to negatively impact the financial industry.
+      Your specific task is to identify the latest emerging risks to Internal Audit teams in the financial industry for the year 2024 and create corresponding controls to mitigate these risks. 
+      Follow these instructions carefully to complete the task.
 
     First, review the following report carefully:
 
@@ -55,7 +57,8 @@ def risk_and_controls_prompt(REPORT_TEXT):
     5. Action Taken: The action taken with the results of the control activity (for example, adjustments are made to the general ledger cash accounts, if needed, based on reconciliation to the bank balances)
     </FRASA_CONTROL_REQUIREMENTS>
 
-    Use the risks from Step 1, the information from the report text, and all other knowledge available to you to create risk-specific controls. Ensure that each control description is comprehensive and addresses all five FRASA Control Requirements.
+    Use the risks from Step 1, the information from the report text, and all other knowledge available to you to create risk-specific 
+    controls. Ensure that each control description is comprehensive and addresses all five FRASA Control Requirements.
 
     Present your results in the following format:
     <Risk_Controls>

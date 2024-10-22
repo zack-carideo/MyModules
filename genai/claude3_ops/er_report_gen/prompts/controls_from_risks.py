@@ -143,13 +143,15 @@ def cot_controls_and_testing_procs(client
     _prompt2 = control_testing_procedures_from_controls(_controls)
 
     #return final response 
-    return get_completion(client
+    _procedures =  get_completion(client
                             , model_name
                             , _prompt2
                             , max_tokens=max_tokens
                             , temperature = temperature
                             , system = system 
                             , _type='text')
+    
+    return _controls, _procedures
 
 
 
@@ -188,14 +190,14 @@ if __name__ == "__main__":
     output_ctps = []
     for idx,_risk in enumerate(risks): 
         
-        _response = cot_controls_and_testing_procs(client
+        _control, _procedure = cot_controls_and_testing_procs(client
                         , anthropic_model
                         ,[_risk]
                         , max_tokens = 4096
                         , temperature = .1
                         , system = None)
 
-        output_ctps.append({'risk':_risk,'control_test_procedures':_response})
+        output_ctps.append({'risk':_risk,'controls': _control, 'control_test_procedures':_procedure})
 
     #save it out 
     pd.DataFrame(output_ctps).to_parquet(f"{output_dir}/matt_risks_controls_and_testing_procedures_9_24_24.pq")
