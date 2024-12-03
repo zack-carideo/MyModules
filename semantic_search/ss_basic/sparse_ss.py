@@ -1,40 +1,15 @@
-
-from rank_bm25 import BM25Okapi
-from sklearn.feature_extraction import _stop_words
-import string
-import tqdm 
-from typing import List, Set
+import string,  tqdm 
+import pandas as pd
 import numpy as np 
+from sklearn.feature_extraction import _stop_words
+from rank_bm25 import BM25Okapi
+from typing import List, Set
 
 def bm25_tokenizer(text: str
                    , stop_words: Set[str] = None
                    , punctuations: str = None
                    ) -> List[str]:
     
-    """
-    Tokenizer for BM25.
-    
-    This function tokenizes the input text by converting it to lowercase, removing punctuation, and filtering out stop words. 
-    It returns a list of tokens that can be used for BM25 ranking.
-
-    Parameters:
-        text (str): The input text to be tokenized.
-            Example: "The quick brown fox jumps over the lazy dog."
-        stop_words (Set[str], optional): A set of stop words to be filtered out from the tokenized text. Defaults to _stop_words.ENGLISH_STOP_WORDS.
-            Example: {"the", "over", "and"}
-        punctuations (str, optional): A string of punctuation characters to be stripped from the tokens. Defaults to string.punctuation.
-            Example: "!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~"
-
-    Returns:
-        List[str]: A list of tokens after processing the input text.
-    
-    Example: 
-        bm25_tokenizer(["quick", "brown", "fox", "jumps", "lazy", "dog"]
-                   , stop_words: Set[str] = _stop_words.ENGLISH_STOP_WORDS
-                   , punctuations: str = string.punctuation
-                   ) -> List[str]:                   
-    """
-
     tokenized_doc = []
     for token in text.lower().split():
         token = token.strip(punctuations) if punctuations else token
@@ -48,100 +23,129 @@ def bm25_tokenizer(text: str
 
     return tokenized_doc
 
-def tokenize_corpus(texts: List[str] 
-                    , punctuations: str = None 
-                    , stop_words: Set[str] = None
-                    ) -> List[List[str]]:
 
+class bm25Search():
     """
-    Tokenizes a list of text passages.
-    Args:
-        texts (List[str]): A list of text passages to be tokenized.
-        punctuations (str, optional): A string of punctuation characters to be removed from the text. Defaults to None.
-        stop_words (Set[str], optional): A set of stop words to be removed from the text. Defaults to None.
-    Returns:
-        List[List[str]]: A list of tokenized text passages, where each passage is represented as a list of tokens.
+    A class to perform BM25 search on a given corpus of documents.
+    Attributes:
+    -----------
+    top_k : int
+        The number of top results to return for each query.
+    run_id : str
+        An identifier for the search run.
+    stop_words : Set[str]
+        A set of stop words to be removed from the documents and queries.
+    punctuations : str
+        A string of punctuation characters to be removed from the documents and queries.
+    corpus : List[str]
+        The corpus of documents to be searched.
+    tokenized_corpus : List[List[str]]
+        The tokenized version of the corpus.
+    bm25 : BM25Okapi
+        The BM25 index built from the tokenized corpus.
+        
+    Methods:
+    --------
+    __init__: 
+        Initializes the bm25Search object with the given parameters and builds the BM25 index.
+    search(query: str) -> List[int]: 
+        Searches the BM25 index for the given query and returns the top k results.
+    search_all(queries: List[str]) -> List[List[int]]:
+        Searches the BM25 index for all the given queries and returns the top k results for each query.
+        The method combines static query information with dynamic search results and returns a list of dictionaries.
+        Each dictionary contains:
+            - 'Query_Index': The index of the query.
+            - 'Query_Text': The text of the query.
+            - 'Run_ID': The run identifier.
+            - 'Chunk_ID': A static value of 1.
+            - 'Similarity_Score': The similarity scores of the top k results.
+            - 'Doc_ID': The document IDs of the top k results.
+            - 'Search_Result': The actual text of the top k results.
     """
     
-    tokenized_corpus = []
-    for passage in tqdm.tqdm(texts):
-        tokenized_corpus.append(bm25_tokenizer(passage
-                                               , punctuations=punctuations
-                                               , stop_words=stop_words))
+    def __init__(self
+                 , corpus: List[str]
+                 , stop_words: Set[str] = None
+                 , punctuations: str = None
+                 , top_k: int = 5
+                 , run_id: str = 'zjc_test'
+                 ):
+        
+        self.top_k = top_k
+        self.run_id = run_id
+        self.stop_words = stop_words
+        self.punctuations = punctuations
+        self.corpus = corpus
+        self.tokenized_corpus = [bm25_tokenizer(doc
+                                                ,  punctuations=punctuations
+                                                , stop_words=stop_words) 
+                                                for doc in tqdm.tqdm(corpus)]
+        
+        self.bm25 = BM25Okapi(self.tokenized_corpus)
+        
+    #search bm25 index on query and return top k results
+    def search(self, query: str) -> List[int]:
 
-    return tokenized_corpus
+        #tokenize query
+        tokenized_query = bm25_tokenizer(query
+                                         , punctuations=self.punctuations
+                                         , stop_words=self.stop_words)
+        
+        #get bm25 scores
+        doc_scores = self.bm25.get_scores(tokenized_query)
+        
+        #sort scores(descending)
+        sorted_doc_ids = np.argsort(doc_scores)[::-1]
 
-def build_sparse_search_index(tokenized_corpus: List[str]) -> BM25Okapi:
+        return {  'Similarity_Score':doc_scores[sorted_doc_ids][:self.top_k] 
+                , 'Doc_ID':sorted_doc_ids[:self.top_k]
+                , 'Search_Result':[self.corpus[idx] for idx in sorted_doc_ids[:self.top_k]]
+                }
     
-    bm25 = BM25Okapi(tokenized_corpus)
+    #search bm25 index on all queries and return top k results
+    def search_all(self, queries: List[str]) -> List[List[int]]:
 
-    return bm25
-
-def keyword_search(query: str
-                   , bm25_index: BM25Okapi
-                   , top_k: int = 3
-                   , num_candidates: int = 15
-                   , punctuations: str = None
-                   , stop_words: Set[str] = None
-                   ) -> List[dict]:
-    """
-    Perform a keyword search using the BM25 index.
-
-    This function takes a query string, tokenizes it, and searches the BM25 index to find the most relevant documents.
-    It returns the top-k results based on the BM25 scores.
-
-    Parameters:
-        query (str): The input query string to search for.
-            Example: "lazy dog"
-        bm25_index (BM25Okapi): The BM25 index built from the corpus.
-        top_k (int, optional): The number of top results to return. Defaults to 3.
-        num_candidates (int, optional): The number of candidate results to consider before selecting the top-k. Defaults to 15.
-
-    Returns:
-        List[dict]: A list of dictionaries containing the corpus_id and score of the top-k results.
+        #combine static query information with dynamic search results
+        return [{
+            **{'Query_Index':[idx for x in range(0,self.top_k)]
+               , 'Query_Text':[query for x in range(0,self.top_k)]
+                ,'Run_ID':[self.run_id for x in range(0,self.top_k)]
+                , 'Chunk_ID':[1 for x in range(0,self.top_k)]
+                },
+                 **self.search(query) }
+                 for idx,query in enumerate(tqdm.tqdm(queries))]
     
-    Example:
-        keyword_search("lazy dog", bm25_index, top_k=3, num_candidates=15) -> [{'corpus_id': 0, 'score': 1.5}, ...]
-    """
-    print("Input question:", query)
 
-    # Encode query (using same tokenizer used to generate bm25 index being searched)
-    encoded_query = bm25_tokenizer(query, punctuations=punctuations, stop_words=stop_words)
-
-    # Search index on query 
-    bm25_scores = bm25_index.get_scores(encoded_query)
-
-    # Return top-n results 
-    top_n = np.argpartition(bm25_scores, -num_candidates)[-num_candidates:]
-    
-    # Sort top-n results by score
-    bm25_hits = [{'corpus_id': idx, 'score': bm25_scores[idx]} for idx in top_n]
-    bm25_hits = sorted(bm25_hits, key=lambda x: x['score'], reverse=True)
-    
-    print(f"Top-3 lexical search (BM25) hits")
-    for hit in bm25_hits[0:top_k]:
-        print("\t{:.3f}\t{}".format(hit['score'], texts[hit['corpus_id']].replace("\n", " ")))
-
-    return bm25_hits
+if __name__ == '__main__':
 
 
-if __name__ == "__main__":
-    
-    #only use preprocessing if strings are very long or if you have a lot of data
+
+    #Note: only use preprocessing if strings are very long or if you have a lot of data
     punctuations = string.punctuation
     stop_words = _stop_words.ENGLISH_STOP_WORDS
 
-    texts = [
-        "The quick brown fox jumps over the lazy dog.",
+
+    _queries = ["quick brown fox"
+                ,"The quick fox is quick"
+                , "lazy dog"
+                , "quick fox"
+                , "lazy dog"
+                , "zack wack"]
+
+    _corpus_text = ["The quick brown fox jumps over the lazy dog.",
         "A quick brown dog outpaces a quick fox.",
-        "The quick fox is quick.",
-        "The dog is lazy."
+        "The quick fox is quick",
+        "The dog is lazy.",
+        "who zack is wack."
     ]
 
-    tokenized_corpus = tokenize_corpus(texts
-                                       , punctuations=None
-                                       , stop_words=None)
-    
-    bm25_index = build_sparse_search_index(tokenized_corpus)
-    
-    results = keyword_search("who is the quick fox", bm25_index, top_k=4, num_candidates=4)
+    #initiate bm25 instance
+    _bm25 = bm25Search(
+        corpus = _corpus_text
+        , stop_words = None
+        , punctuations = punctuations
+        , top_k = 2
+    )
+
+    #search for top k results and return dataframe
+    pd.concat([pd.DataFrame(x) for x in _bm25.search_all(_queries)])
